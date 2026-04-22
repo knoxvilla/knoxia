@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KnoxiaOS</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Tahoma', sans-serif; color: white; }
+        canvas { display: block; }
+        #os-screen-canvas { display: none; }
+
+        /* UI Overlay */
+        #ui-overlay { position: fixed; top: 40px; left: 40px; z-index: 100; transition: opacity 1s ease; }
+        .top-left-meta { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
+        
+        #enter-btn {
+            padding: 12px 28px; font-size: 13px; font-weight: bold; color: white;
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer; transition: all 0.3s ease; letter-spacing: 2px;
+        }
+        #enter-btn:hover { background: white; color: black; }
+
+        .credits { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.6; opacity: 0.7; }
+        .credits p { margin: 0; }
+        .credits a { color: white; text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
+        .credits a:hover { border-bottom-color: white; }
+
+        #info-btn { background: none; border: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.5); padding: 5px 15px; font-size: 10px; cursor: pointer; transition: 0.3s; }
+        #info-btn:hover { border-color: white; color: white; }
+
+        /* Modal */
+        #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: opacity 0.4s ease; }
+        .modal-hidden { opacity: 0; pointer-events: none; }
+        .modal-content { width: 100%; max-width: 400px; padding: 40px; border: 1px solid rgba(255,255,255,0.2); background: black; text-align: left; }
+        .modal-content h2 { margin: 0 0 20px 0; letter-spacing: 4px; font-weight: normal; }
+        #close-info { margin-top: 20px; background: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="ui-overlay">
+        <div class="top-left-meta">
+            <button id="enter-btn">ENTER EXPERIENCE</button>
+            <div class="credits">
+                <p>Made by <strong>Ramsey Knox</strong></p>
+                <p>Model by <a href="https://sketchfab.com/3d-models/rm-c-series-computer-read-desc-739bcfabdd244375b37010701d43b86d" target="_blank">Charlie Chapelton</a></p>
+            </div>
+            <button id="info-btn">INFO</button>
+        </div>
+    </div>
+
+    <div id="info-modal" class="modal-hidden">
+        <div class="modal-content">
+            <h2>KNOXIA OS</h2>
+            <p>An interactive digital archive exploring mid-2000s hardware aesthetics.</p>
+            <p>Click the monitor's physical power button to initiate the boot sequence once the camera has docked.</p>
+            <button id="close-info">RETURN</button>
+        </div>
+    </div>
+
+    <canvas id="monitor-canvas"></canvas>
+    <canvas id="os-screen-canvas" width="1024" height="768"></canvas>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
