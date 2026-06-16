@@ -597,21 +597,32 @@ function surfaceBase(p) {
 
 // ── Chat surface (Lyra) ───────────────────────────────────────────────────
 function buildChatSurface(container, p) {
+    // ── Supabase config ───────────────────────────────────────────────
+    const SUPA_URL = 'https://tmgyzqmelczjqlebmgpv.supabase.co';
+    const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZ3l6cW1lbGN6anFsZWJtZ3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjYyMTYsImV4cCI6MjA5NzIwMjIxNn0.YqR0tyNbQA8uLFuikwmk0GfxBHUXkNrdS4x5YCCziXU';
+    const headers  = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+
+    let realtimeSocket = null;
+    let seenIds = new Set();
+    // Visitor gets a random name each session so messages are distinguishable
+    const visitorName = 'Visitor_' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
     Object.assign(container.style, { position:'fixed', inset:0, zIndex:550 });
     const base = surfaceBase(p);
 
+    // ── Terminal window ───────────────────────────────────────────────
     const terminal = document.createElement('div');
     terminal.style.cssText = [
         'position:relative', 'z-index:2',
-        'width:min(520px,90vw)', 'height:420px',
-        'background:rgba(0,0,8,0.85)',
+        'width:min(520px,90vw)', 'height:440px',
+        'background:rgba(0,0,8,0.88)',
         `border:1px solid ${p.glowColor}44`,
         'border-radius:12px', 'overflow:hidden',
         'display:flex', 'flex-direction:column',
         `box-shadow:0 0 40px ${p.glowColor}22, inset 0 1px 0 rgba(255,255,255,0.06)`,
     ].join(';');
 
-    // Terminal header
+    // Traffic lights + title
     const termHead = document.createElement('div');
     termHead.style.cssText = [
         'height:36px', 'display:flex', 'align-items:center', 'padding:0 14px', 'gap:8px',
@@ -619,82 +630,83 @@ function buildChatSurface(container, p) {
         `border-bottom:1px solid ${p.glowColor}33`,
         'flex-shrink:0',
     ].join(';');
-
-    const dot = (c) => {
-        const d = document.createElement('div');
-        d.style.cssText = `width:10px;height:10px;border-radius:50%;background:${c};`;
-        return d;
-    };
+    const dot = c => { const d = document.createElement('div'); d.style.cssText = `width:10px;height:10px;border-radius:50%;background:${c};`; return d; };
     termHead.append(dot('#ff5f57'), dot('#febc2e'), dot('#28c840'));
-
     const termTitle = document.createElement('span');
-    termTitle.style.cssText = `color:${p.glowColor};font-size:11px;font-weight:600;letter-spacing:0.06em;margin-left:6px;`;
+    termTitle.style.cssText = `color:${p.glowColor};font-size:11px;font-weight:600;letter-spacing:0.06em;margin-left:6px;flex:1;`;
     termTitle.textContent = 'LYRA COMMS — OPEN CHANNEL';
-    termHead.appendChild(termTitle);
+    // Connection status dot
+    const statusDot = document.createElement('span');
+    statusDot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#555;display:inline-block;margin-left:auto;';
+    statusDot.title = 'Connecting…';
+    termHead.append(termTitle, statusDot);
     terminal.appendChild(termHead);
 
-    // Messages area
+    // ── Messages area ─────────────────────────────────────────────────
     const msgs = document.createElement('div');
     msgs.style.cssText = [
         'flex:1', 'overflow-y:auto', 'padding:14px',
         'display:flex', 'flex-direction:column', 'gap:8px',
     ].join(';');
+    terminal.appendChild(msgs);
 
-    const addMsg = (text, from, isSystem) => {
+    function fmtTime(ts) {
+        const d = new Date(ts);
+        return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+    }
+
+    function addMsg(text, from, isSystem, ts) {
+        // Deduplicate by content+author if needed
         const row = document.createElement('div');
-        row.style.cssText = `display:flex;flex-direction:column;align-items:${from === 'You' ? 'flex-end' : 'flex-start'};`;
+        const isSelf = from === visitorName;
+        row.style.cssText = `display:flex;flex-direction:column;align-items:${isSystem ? 'center' : isSelf ? 'flex-end' : 'flex-start'};`;
 
         if (isSystem) {
-            row.style.alignItems = 'center';
             const sys = document.createElement('div');
-            sys.style.cssText = `font-size:10px;color:rgba(200,220,255,0.35);letter-spacing:0.06em;padding:2px 0;`;
+            sys.style.cssText = 'font-size:10px;color:rgba(200,220,255,0.3);letter-spacing:0.06em;padding:2px 0;';
             sys.textContent = text;
             row.appendChild(sys);
             msgs.appendChild(row);
+            msgs.scrollTop = msgs.scrollHeight;
             return;
         }
 
         const bubble = document.createElement('div');
         bubble.style.cssText = [
-            'max-width:75%', 'padding:8px 12px', 'border-radius:10px',
+            'max-width:75%', 'padding:8px 12px',
             'font-size:12px', 'line-height:1.5',
-            from === 'You'
+            isSelf
                 ? `background:rgba(${hexToRgb(p.glowColor)},0.2);color:${p.glowColor};border:1px solid ${p.glowColor}44;border-radius:10px 10px 2px 10px;`
-                : `background:rgba(255,255,255,0.06);color:rgba(200,220,255,0.85);border:1px solid rgba(255,255,255,0.08);border-radius:10px 10px 10px 2px;`,
+                : 'background:rgba(255,255,255,0.06);color:rgba(200,220,255,0.88);border:1px solid rgba(255,255,255,0.08);border-radius:10px 10px 10px 2px;',
         ].join(';');
         bubble.textContent = text;
 
-        const label = document.createElement('div');
-        label.style.cssText = `font-size:9px;color:rgba(200,220,255,0.35);margin-top:3px;letter-spacing:0.04em;`;
-        label.textContent = from;
+        const meta = document.createElement('div');
+        meta.style.cssText = 'font-size:9px;color:rgba(200,220,255,0.3);margin-top:3px;letter-spacing:0.04em;';
+        meta.textContent = ts ? `${from} · ${fmtTime(ts)}` : from;
 
-        row.append(bubble, label);
+        row.append(bubble, meta);
         msgs.appendChild(row);
         msgs.scrollTop = msgs.scrollHeight;
-    };
+    }
 
-    addMsg('CHANNEL OPEN — LYRA COMMS ARRAY', '', true);
-    addMsg('Signal acquired. Who\'s there?', 'Lyra Control', false);
-    setTimeout(() => addMsg('Transmission incoming from KnoxiaOS...', 'Lyra Control', false), 900);
-
-    terminal.appendChild(msgs);
-
-    // Input row
+    // ── Input row ─────────────────────────────────────────────────────
     const inputRow = document.createElement('div');
     inputRow.style.cssText = [
-        'height:44px', 'display:flex', 'align-items:center',
-        'padding:0 10px', 'gap:8px',
+        'height:48px', 'display:flex', 'align-items:center',
+        'padding:0 12px', 'gap:8px',
         `border-top:1px solid ${p.glowColor}22`,
         'flex-shrink:0',
     ].join(';');
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.placeholder = 'Send a message…';
+    input.placeholder = 'Transmit a message…';
+    input.maxLength = 300;
     input.style.cssText = [
         'flex:1', 'background:rgba(255,255,255,0.05)',
         `border:1px solid ${p.glowColor}33`, 'border-radius:6px',
-        'padding:0 10px', 'height:28px',
+        'padding:0 10px', 'height:30px',
         'color:rgba(220,235,255,0.9)', 'font-size:12px',
         'outline:none',
         'font-family:Helvetica Neue,Helvetica,Arial,sans-serif',
@@ -704,30 +716,130 @@ function buildChatSurface(container, p) {
     const sendBtn = document.createElement('button');
     sendBtn.textContent = 'Send';
     sendBtn.style.cssText = [
-        'height:28px', 'padding:0 14px',
+        'height:30px', 'padding:0 16px',
         `background:rgba(${hexToRgb(p.glowColor)},0.2)`,
         `border:1px solid ${p.glowColor}55`,
         `color:${p.glowColor}`, 'border-radius:6px',
-        'font-size:11px', 'font-weight:600', 'cursor:pointer',
+        'font-size:11px', 'font-weight:700', 'cursor:pointer',
         'font-family:Helvetica Neue,Helvetica,Arial,sans-serif',
+        'transition:background 0.15s',
+        'flex-shrink:0',
     ].join(';');
 
+    inputRow.append(input, sendBtn);
+    terminal.appendChild(inputRow);
+    base.appendChild(terminal);
+    container.appendChild(base);
+
+    // ── Supabase: load recent messages ────────────────────────────────
+    async function loadHistory() {
+        try {
+            const res = await fetch(
+                `${SUPA_URL}/rest/v1/messages?select=*&order=created_at.asc&limit=60`,
+                { headers }
+            );
+            if (!res.ok) throw new Error(await res.text());
+            const rows = await res.json();
+            addMsg('CHANNEL OPEN — LYRA COMMS ARRAY', '', true);
+            if (rows.length === 0) {
+                addMsg('No prior transmissions. Be the first.', '', true);
+            } else {
+                addMsg(`— ${rows.length} prior message${rows.length !== 1 ? 's' : ''} —`, '', true);
+                rows.forEach(r => { seenIds.add(r.id); addMsg(r.content, r.author, false, r.created_at); });
+            }
+            statusDot.style.background = '#22dd88';
+            statusDot.title = 'Connected';
+        } catch (e) {
+            addMsg('Connection error. Check console.', '', true);
+            console.error('[Lyra]', e);
+        }
+    }
+
+    // ── Supabase: send message ────────────────────────────────────────
+    async function sendMessage(text) {
+        sendBtn.disabled = true;
+        try {
+            const res = await fetch(`${SUPA_URL}/rest/v1/messages`, {
+                method: 'POST',
+                headers: { ...headers, 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ author: visitorName, content: text }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+        } catch (e) {
+            addMsg('Failed to send. Try again.', '', true);
+            console.error('[Lyra]', e);
+        }
+        sendBtn.disabled = false;
+    }
+
+    // ── Supabase Realtime (WebSocket) ─────────────────────────────────
+    function connectRealtime() {
+        const wsUrl = SUPA_URL.replace('https://', 'wss://') + '/realtime/v1/websocket?apikey=' + SUPA_KEY + '&vsn=1.0.0';
+        realtimeSocket = new WebSocket(wsUrl);
+
+        realtimeSocket.onopen = () => {
+            // Join the postgres_changes channel
+            realtimeSocket.send(JSON.stringify({
+                topic:   'realtime:public:messages',
+                event:   'phx_join',
+                payload: {
+                    config: {
+                        broadcast:  { self: false },
+                        presence:   { key: '' },
+                        postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'messages' }],
+                    }
+                },
+                ref: '1',
+            }));
+        };
+
+        realtimeSocket.onmessage = (evt) => {
+            try {
+                const msg = JSON.parse(evt.data);
+                // Heartbeat reply
+                if (msg.event === 'phx_reply' && msg.payload?.status === 'ok') return;
+                if (msg.event === 'heartbeat') {
+                    realtimeSocket.send(JSON.stringify({ topic:'phoenix', event:'heartbeat', payload:{}, ref:'hb' }));
+                    return;
+                }
+                // New row inserted
+                if (msg.event === 'postgres_changes' || msg.event === 'INSERT') {
+                    const row = msg.payload?.data?.record || msg.payload?.record;
+                    if (row && !seenIds.has(row.id)) {
+                        seenIds.add(row.id);
+                        addMsg(row.content, row.author, false, row.created_at);
+                    }
+                }
+            } catch(e) {}
+        };
+
+        realtimeSocket.onclose = () => {
+            statusDot.style.background = '#dd4422';
+            statusDot.title = 'Disconnected';
+        };
+    }
+
+    // ── Send handler ──────────────────────────────────────────────────
     const send = () => {
         const txt = input.value.trim();
-        if (!txt) return;
-        addMsg(txt, 'You', false);
+        if (!txt || sendBtn.disabled) return;
         input.value = '';
-        // Echo placeholder
-        setTimeout(() => addMsg('Message received. Channel is live — connect a real service here.', 'Lyra Control', false), 800);
+        // Optimistically show the message immediately
+        addMsg(txt, visitorName, false, new Date().toISOString());
+        sendMessage(txt);
     };
 
     sendBtn.addEventListener('click', send);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); e.stopPropagation(); });
-    inputRow.append(input, sendBtn);
-    terminal.appendChild(inputRow);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.stopPropagation(); send(); } });
 
-    base.appendChild(terminal);
-    container.appendChild(base);
+    // ── Cleanup on leave ──────────────────────────────────────────────
+    container._cleanup = () => {
+        if (realtimeSocket) { realtimeSocket.close(); realtimeSocket = null; }
+    };
+
+    // ── Boot ──────────────────────────────────────────────────────────
+    loadHistory();
+    connectRealtime();
 }
 
 // ── Game surface (Vex) ────────────────────────────────────────────────────
