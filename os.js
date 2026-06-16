@@ -999,6 +999,186 @@
         startClock();
         attachGlobalEvents();
         if (!audio && playlist.length > 0) loadTrack(0);
+        // Show welcome message after short delay
+        setTimeout(showWelcomePopup, 2000);
+    }
+
+    // ── Welcome popup ─────────────────────────────────────────────────────
+    function showWelcomePopup() {
+        const desktop = document.getElementById('desktop');
+        if (!desktop || document.getElementById('welcome-popup')) return;
+
+        const MESSAGE = "hey, welcome to KnoxiaOS. feel free to explore — open Orbit to visit the star system and discover what\'s out there. want to talk to people? the chat app has you covered. enjoy the ride.";
+
+        // Inject keyframes once
+        if (!document.getElementById('popup-kf')) {
+            const s = document.createElement('style');
+            s.id = 'popup-kf';
+            s.textContent = [
+                '@keyframes popup-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}',
+                '@keyframes dot-bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}',
+            ].join('');
+            document.head.appendChild(s);
+        }
+
+        const popup = el('div');
+        popup.id = 'welcome-popup';
+        popup.style.cssText = [
+            'position:absolute',
+            'bottom:16px', 'right:16px',
+            'width:272px',
+            'border-radius:10px',
+            'overflow:hidden',
+            'display:flex', 'flex-direction:column',
+            'border:1px solid rgba(60,90,140,0.4)',
+            'box-shadow:0 12px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.2)',
+            'animation:popup-in 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+            'z-index:1200',
+        ].join(';');
+
+        // Titlebar
+        const titlebar = el('div');
+        titlebar.style.cssText = [
+            'height:22px',
+            'display:flex', 'align-items:center', 'padding:0 8px', 'gap:5px',
+            'flex-shrink:0',
+            'background:repeating-linear-gradient(180deg,rgba(255,255,255,0.07)0px,rgba(255,255,255,0.07)1px,transparent 1px,transparent 2px),linear-gradient(180deg,#d8e2ee 0%,#c4d0de 35%,#b8c8d8 65%,#bcc8d6 100%)',
+            'border-bottom:1px solid rgba(90,120,165,0.4)',
+            'cursor:default',
+        ].join(';');
+
+        // Traffic lights
+        const tls = el('div', 'xp-controls');
+        const closeBtn = el('button', 'xp-btn xp-btn-close');
+        const minBtn   = el('button', 'xp-btn xp-btn-minimize');
+        const maxBtn   = el('button', 'xp-btn xp-btn-maximize');
+        tls.append(closeBtn, minBtn, maxBtn);
+
+        const titleEl = el('div');
+        titleEl.style.cssText = 'position:absolute;left:0;right:0;text-align:center;font-size:11px;font-weight:600;color:#1a2a3a;text-shadow:0 1px 0 rgba(255,255,255,0.7);pointer-events:none;';
+        titleEl.textContent = 'Ramsey Knox';
+
+        titlebar.append(tls, titleEl);
+
+        // Body
+        const body = el('div');
+        body.style.cssText = [
+            'background:rgba(234,240,250,0.98)',
+            'padding:12px',
+            'display:flex', 'flex-direction:column', 'gap:10px',
+            'min-height:120px',
+        ].join(';');
+
+        // Avatar + name row
+        const avatarRow = el('div');
+        avatarRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
+        const avatar = el('div');
+        avatar.style.cssText = [
+            'width:32px', 'height:32px', 'border-radius:50%', 'flex-shrink:0',
+            'background:conic-gradient(from 180deg,#1144aa,#3388ff,#1144aa,#0a2266,#3388ff,#1144aa)',
+            'border:2px solid rgba(100,140,210,0.4)',
+            'box-shadow:0 1px 4px rgba(0,0,0,0.2)',
+            'display:flex', 'align-items:center', 'justify-content:center',
+            'font-size:11px', 'font-weight:700', 'color:white',
+            'position:relative', 'overflow:hidden',
+        ].join(';');
+        const avatarGloss = el('div');
+        avatarGloss.style.cssText = 'position:absolute;top:2px;left:4px;width:10px;height:8px;background:rgba(255,255,255,0.35);border-radius:50%;transform:rotate(-20deg);';
+        avatar.appendChild(avatarGloss);
+
+        const nameEl = el('div');
+        nameEl.style.cssText = 'font-size:12px;font-weight:700;color:#1a2a3a;';
+        nameEl.textContent = 'Ramsey Knox';
+
+        const onlineEl = el('div');
+        onlineEl.style.cssText = 'display:flex;align-items:center;gap:4px;margin-left:auto;';
+        const onlineDot = el('div');
+        onlineDot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#22cc66;box-shadow:0 0 6px rgba(34,204,102,0.6);';
+        const onlineLabel = el('div');
+        onlineLabel.style.cssText = 'font-size:9px;color:#3a7a4a;font-weight:600;letter-spacing:0.04em;';
+        onlineLabel.textContent = 'online';
+        onlineEl.append(onlineDot, onlineLabel);
+
+        avatarRow.append(avatar, nameEl, onlineEl);
+        body.appendChild(avatarRow);
+
+        // Divider
+        const div = el('div');
+        div.style.cssText = 'height:1px;background:linear-gradient(90deg,transparent,rgba(80,120,180,0.25),transparent);';
+        body.appendChild(div);
+
+        // Message area
+        const msgArea = el('div');
+        msgArea.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+
+        // Typing indicator
+        const typingBubble = el('div');
+        typingBubble.style.cssText = [
+            'display:inline-flex', 'align-items:center', 'gap:3px',
+            'background:rgba(200,215,240,0.7)',
+            'border:1px solid rgba(100,130,180,0.2)',
+            'border-radius:10px 10px 10px 2px',
+            'padding:7px 10px',
+            'align-self:flex-start',
+        ].join(';');
+
+        for (let i = 0; i < 3; i++) {
+            const dot = el('div');
+            dot.style.cssText = [
+                'width:5px', 'height:5px', 'border-radius:50%',
+                'background:#6688aa',
+                `animation:dot-bounce 1.2s ease-in-out infinite`,
+                `animation-delay:${i * 0.18}s`,
+            ].join(';');
+            typingBubble.appendChild(dot);
+        }
+
+        msgArea.appendChild(typingBubble);
+        body.appendChild(msgArea);
+        popup.append(titlebar, body);
+        desktop.appendChild(popup);
+
+        // After typing animation, replace with message
+        setTimeout(() => {
+            typingBubble.remove();
+
+            const msgBubble = el('div');
+            msgBubble.style.cssText = [
+                'background:rgba(200,215,240,0.7)',
+                'border:1px solid rgba(100,130,180,0.2)',
+                'border-radius:10px 10px 10px 2px',
+                'padding:9px 11px',
+                'font-size:11px', 'line-height:1.6',
+                'color:#1a2a3a',
+                'align-self:flex-start',
+                'animation:popup-in 0.3s ease',
+            ].join(';');
+            msgBubble.textContent = MESSAGE;
+            msgArea.appendChild(msgBubble);
+
+            // Dismiss hint
+            const hint = el('div');
+            hint.style.cssText = 'font-size:9px;color:#8a9aaa;text-align:right;margin-top:2px;letter-spacing:0.03em;';
+            hint.textContent = 'click × to dismiss';
+            body.appendChild(hint);
+        }, 2200);
+
+        // Close button dismisses with fade
+        closeBtn.addEventListener('click', () => {
+            popup.style.transition = 'opacity 0.25s, transform 0.25s';
+            popup.style.opacity    = '0';
+            popup.style.transform  = 'translateY(8px)';
+            setTimeout(() => popup.remove(), 260);
+        });
+
+        // Min/max do nothing on this popup
+        minBtn.addEventListener('click', () => {
+            popup.style.transition = 'opacity 0.2s';
+            popup.style.opacity    = '0';
+            setTimeout(() => popup.remove(), 220);
+        });
+        maxBtn.addEventListener('click', () => {});
     }
 
     window.KnoxiaOS = { init: initOS };
