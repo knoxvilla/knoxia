@@ -95,6 +95,21 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(() => { if (appState === 'INTRO') spawnShootingStar(); }, 4500);
 
     let monitorGroup;
+
+    // ── Screen texture canvas ──────────────────────────────────────────────
+    // Renders directly onto the CRT screen mesh via CanvasTexture
+    const screenCanvas  = document.createElement('canvas');
+    screenCanvas.width  = 512;
+    screenCanvas.height = 384;
+    const screenCtx     = screenCanvas.getContext('2d');
+    let   screenTexture = null;
+
+    function clearScreenCanvas() {
+        screenCtx.fillStyle = '#000';
+        screenCtx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
+        if (screenTexture) screenTexture.needsUpdate = true;
+    }
+    clearScreenCanvas();
     const mouse     = new THREE.Vector2();
     const raycaster = new THREE.Raycaster();
     window.addEventListener('mousemove', e => {
@@ -838,13 +853,105 @@ window.addEventListener('DOMContentLoaded', () => {
         monitorGroup.position.y = -3.5;
         monitorGroup.scale.set(0, 0, 0);
 
+        // Map our canvas texture onto the screen mesh
+        screenTexture = new THREE.CanvasTexture(screenCanvas);
+        monitorGroup.traverse(child => {
+            if (child.name === 'RM_Monitor_Type_2_(CRT)_Screen_Surface001_0') {
+                child.material = new THREE.MeshBasicMaterial({ map: screenTexture });
+            }
+        });
+
         gsap.to(monitorGroup.scale, { x:1, y:1, z:1, duration:2, ease:'power4.out' });
         gsap.to(starFieldA.material, { opacity:0.8, duration:3, delay:0.5 });
         gsap.to(introLight,          { intensity:80, duration:2.5 });
 
         appState = 'INTRO';
         gsap.to(uiOverlay, { opacity:1, duration:1.5 });
+
+        // Start idle easter egg — triggers after 12 seconds of inactivity
+        startMonitorIdleEasterEgg();
     });
+
+    // ── Monitor idle easter egg ───────────────────────────────────────────
+    // Draws text directly onto the CRT screen mesh via CanvasTexture.
+    function startMonitorIdleEasterEgg() {
+        const MESSAGES = [
+            'enter the experience. cmon',
+            'wtf you waiting for',
+            'what happened to lil pump...',
+            'still here? really?',
+            '...How About Now?',
+            'gakfsjgklafdsjgakljdhfgjdgkgjdkjgdklgdkdghs4hjafljghadfljghughsairofghiauoh7290456y1074895HEEEEEEEEEEEEEEYYYYYYYHOWUDOING???????????????HIHIHHIHIHIHIHIHNONOEWILLREADTHISPROBABLYBUTAYEIFYOUARE.... ILY <3gasffguhipfghy13r08t1y3804 END OF TRANSMISSIONSYKE LMFAO YALL THOGHT??????? Just enter experience please................................................................................................................................................................................................................................................',
+            'shoutout claude for this',
+            'very buggy btw',
+            'miley cyrus the goat',
+            "the experience won't bite.",
+        ];
+        const chosen = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+
+        let eggRAF    = null;
+        let eggActive = false;
+        let typedLen  = 0;
+        let blinkOn   = true;
+        let lastBlink = 0;
+        let lastType  = 0;
+        let phase     = 'typing';
+        const TYPE_SPEED  = 60;
+        const BLINK_SPEED = 530;
+        const W = screenCanvas.width;
+        const H = screenCanvas.height;
+
+        const idleTimer = setTimeout(() => {
+            if (appState !== 'INTRO') return;
+            eggActive = true;
+
+            function drawEgg(now) {
+                if (!eggActive || appState !== 'INTRO') {
+                    clearScreenCanvas();
+                    return;
+                }
+                eggRAF = requestAnimationFrame(drawEgg);
+
+                screenCtx.fillStyle = '#000';
+                screenCtx.fillRect(0, 0, W, H);
+
+                if (phase === 'typing') {
+                    if (now - lastType > TYPE_SPEED) {
+                        lastType = now;
+                        if (typedLen < chosen.length) typedLen++;
+                        else { phase = 'blinking'; lastBlink = now; }
+                    }
+                }
+                if (phase === 'blinking') {
+                    if (now - lastBlink > BLINK_SPEED) { lastBlink = now; blinkOn = !blinkOn; }
+                }
+
+                const display = chosen.slice(0, typedLen) + (phase === 'blinking' ? (blinkOn ? '|' : ' ') : '|');
+
+                screenCtx.font         = "16px 'Courier New', monospace";
+                screenCtx.textAlign    = 'center';
+                screenCtx.textBaseline = 'middle';
+                screenCtx.shadowColor  = 'rgba(0, 0, 0, 0.7)';
+                screenCtx.shadowBlur   = 10;
+                screenCtx.fillStyle    = 'rgba(255, 255, 255, 0.95)';
+                screenCtx.fillText(display, W / 2, H / 2);
+                screenCtx.shadowBlur   = 0;
+
+                if (screenTexture) screenTexture.needsUpdate = true;
+            }
+
+            eggRAF = requestAnimationFrame(drawEgg);
+        }, 12000);
+
+        const cancelEgg = () => {
+            clearTimeout(idleTimer);
+            eggActive = false;
+            if (eggRAF) cancelAnimationFrame(eggRAF);
+            clearScreenCanvas();
+        };
+
+        document.getElementById('enter-btn')?.addEventListener('click', cancelEgg, { once: true });
+    }
 
     // ═════════════════════════════════════════════════════════════════════
     // RENDER LOOP — renders whichever scene is active

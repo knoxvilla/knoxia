@@ -826,7 +826,172 @@
     }
 
     // ── Init ─────────────────────────────────────────────────────────────
+    // ── Lock screen ──────────────────────────────────────────────────────
+    const MAINTENANCE_MODE = true;  // set false to disable lock screen
+    const LOCK_PASSWORD    = 'knoxialover';
+
+    function showLockScreen(onUnlock) {
+        const lock = el('div');
+        lock.id = 'lock-screen';
+        lock.style.cssText = [
+            'position:fixed', 'inset:0', 'z-index:9999',
+            'display:flex', 'align-items:center', 'justify-content:center',
+            'font-family:Helvetica Neue,Helvetica,Arial,sans-serif',
+            'background:rgba(0,0,8,0.96)',
+        ].join(';');
+
+        // Inject lock screen keyframes
+        if (!document.getElementById('lock-kf')) {
+            const s = document.createElement('style');
+            s.id = 'lock-kf';
+            s.textContent = [
+                '@keyframes lock-shake{0%,100%{transform:translateX(0)}',
+                '15%{transform:translateX(-8px)}',
+                '30%{transform:translateX(8px)}',
+                '45%{transform:translateX(-6px)}',
+                '60%{transform:translateX(6px)}',
+                '75%{transform:translateX(-3px)}',
+                '90%{transform:translateX(3px)}}',
+                '@keyframes lock-fadein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}',
+            ].join('');
+            document.head.appendChild(s);
+        }
+
+        // Card
+        const card = el('div');
+        card.style.cssText = [
+            'background:linear-gradient(180deg,rgba(220,232,252,0.97),rgba(200,218,245,0.97))',
+            'border:1px solid rgba(100,140,210,0.5)',
+            'border-radius:14px',
+            'padding:36px 40px 28px',
+            'width:320px',
+            'display:flex', 'flex-direction:column', 'align-items:center', 'gap:14px',
+            'box-shadow:0 24px 60px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.5)',
+            'animation:lock-fadein 0.5s ease',
+        ].join(';');
+
+        // Globe orb
+        const orb = el('div');
+        orb.style.cssText = [
+            'width:56px', 'height:56px', 'border-radius:50%',
+            'background:conic-gradient(from 180deg,#1144aa,#3388ff,#1144aa,#0a2266,#3388ff,#1144aa)',
+            'border:2px solid #0a2266',
+            'box-shadow:0 4px 16px rgba(0,50,180,0.5),inset 0 2px 0 rgba(255,255,255,0.3)',
+            'position:relative', 'overflow:hidden', 'flex-shrink:0',
+        ].join(';');
+        const orbGloss = el('div');
+        orbGloss.style.cssText = 'position:absolute;top:4px;left:8px;width:16px;height:13px;background:rgba(255,255,255,0.38);border-radius:50%;transform:rotate(-20deg);';
+        orb.appendChild(orbGloss);
+
+        // Title
+        const title = el('div');
+        title.style.cssText = 'font-size:17px;font-weight:700;color:#0a1a2a;letter-spacing:-0.01em;';
+        title.textContent = 'KnoxiaOS';
+
+        // Subtitle
+        const sub = el('div');
+        sub.style.cssText = 'font-size:11px;color:#4a6a8a;font-weight:500;letter-spacing:0.04em;margin-top:-8px;';
+        sub.textContent = 'MAINTENANCE MODE';
+
+        // Divider
+        const div = el('div');
+        div.style.cssText = 'height:1px;width:100%;background:linear-gradient(90deg,transparent,rgba(80,120,180,0.3),transparent);';
+
+        // Input wrapper (for shake animation)
+        const inputWrap = el('div');
+        inputWrap.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:8px;';
+
+        const input = el('input');
+        input.type        = 'password';
+        input.placeholder = 'Enter password';
+        input.autocomplete = 'off';
+        input.style.cssText = [
+            'width:100%', 'height:36px',
+            'background:white',
+            'border:1px solid rgba(80,120,180,0.4)',
+            'border-radius:7px',
+            'padding:0 12px',
+            'font-size:13px',
+            'color:#1a2a3a',
+            'outline:none',
+            'font-family:Helvetica Neue,Helvetica,Arial,sans-serif',
+            'box-shadow:inset 0 1px 3px rgba(0,0,0,0.08)',
+            'box-sizing:border-box',
+        ].join(';');
+        input.style.userSelect = 'text';
+
+        const errMsg = el('div');
+        errMsg.style.cssText = 'font-size:11px;color:#cc2222;text-align:center;height:14px;font-weight:500;';
+
+        inputWrap.append(input, errMsg);
+
+        // Submit button
+        const btn = el('button');
+        btn.textContent = 'Unlock';
+        btn.style.cssText = [
+            'width:100%', 'height:34px',
+            'background:linear-gradient(180deg,#4488ee,#2260bb)',
+            'border:1px solid rgba(20,60,140,0.5)',
+            'border-radius:7px',
+            'color:white',
+            'font-size:12px', 'font-weight:700',
+            'cursor:pointer', 'letter-spacing:0.04em',
+            'font-family:Helvetica Neue,Helvetica,Arial,sans-serif',
+            'box-shadow:0 2px 6px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.2)',
+            'transition:filter 0.15s',
+        ].join(';');
+        btn.addEventListener('mouseenter', () => btn.style.filter = 'brightness(1.1)');
+        btn.addEventListener('mouseleave', () => btn.style.filter = 'brightness(1)');
+
+        // Footer note
+        const note = el('div');
+        note.style.cssText = 'font-size:10px;color:#8a9aaa;text-align:center;margin-top:2px;';
+        note.textContent = 'This system is under maintenance.';
+
+        card.append(orb, title, sub, div, inputWrap, btn, note);
+        lock.appendChild(card);
+        document.body.appendChild(lock);
+
+        // Focus input after paint
+        requestAnimationFrame(() => input.focus());
+
+        function attempt() {
+            if (input.value === LOCK_PASSWORD) {
+                // Correct — fade out lock screen
+                lock.style.transition = 'opacity 0.4s';
+                lock.style.opacity    = '0';
+                setTimeout(() => {
+                    lock.remove();
+                    onUnlock();
+                }, 400);
+            } else {
+                // Wrong — shake and show error
+                errMsg.textContent = 'Incorrect password.';
+                input.value = '';
+                inputWrap.style.animation = 'none';
+                requestAnimationFrame(() => {
+                    inputWrap.style.animation = 'lock-shake 0.5s ease';
+                });
+                input.focus();
+                setTimeout(() => { errMsg.textContent = ''; }, 2000);
+            }
+        }
+
+        btn.addEventListener('click', attempt);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.stopPropagation(); attempt(); }
+        });
+    }
+
     function initOS() {
+        if (MAINTENANCE_MODE) {
+            showLockScreen(bootDesktop);
+        } else {
+            bootDesktop();
+        }
+    }
+
+    function bootDesktop() {
         buildMenubar();
         buildDock();
         buildAppMenu();

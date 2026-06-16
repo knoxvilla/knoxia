@@ -777,45 +777,65 @@ function buildChatSurface(container, p) {
         const wsUrl = SUPA_URL.replace('https://', 'wss://') + '/realtime/v1/websocket?apikey=' + SUPA_KEY + '&vsn=1.0.0';
         realtimeSocket = new WebSocket(wsUrl);
 
+        let heartbeatInterval = null;
+        let joinRef = '1';
+
         realtimeSocket.onopen = () => {
-            // Join the postgres_changes channel
+            // Supabase realtime v2: topic must be 'realtime:*' with filter in config
             realtimeSocket.send(JSON.stringify({
-                topic:   'realtime:public:messages',
+                topic:   'realtime:knoxia-chat',
                 event:   'phx_join',
                 payload: {
                     config: {
-                        broadcast:  { self: false },
-                        presence:   { key: '' },
-                        postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'messages' }],
+                        postgres_changes: [{
+                            event:  'INSERT',
+                            schema: 'public',
+                            table:  'messages',
+                        }],
                     }
                 },
-                ref: '1',
+                ref: joinRef,
             }));
+
+            heartbeatInterval = setInterval(() => {
+                if (realtimeSocket && realtimeSocket.readyState === WebSocket.OPEN) {
+                    realtimeSocket.send(JSON.stringify({
+                        topic: 'phoenix', event: 'heartbeat', payload: {}, ref: 'hb',
+                    }));
+                }
+            }, 20000);
         };
 
         realtimeSocket.onmessage = (evt) => {
             try {
                 const msg = JSON.parse(evt.data);
-                // Heartbeat reply
-                if (msg.event === 'phx_reply' && msg.payload?.status === 'ok') return;
-                if (msg.event === 'heartbeat') {
-                    realtimeSocket.send(JSON.stringify({ topic:'phoenix', event:'heartbeat', payload:{}, ref:'hb' }));
-                    return;
-                }
-                // New row inserted
-                if (msg.event === 'postgres_changes' || msg.event === 'INSERT') {
-                    const row = msg.payload?.data?.record || msg.payload?.record;
-                    if (row && !seenIds.has(row.id)) {
-                        seenIds.add(row.id);
-                        addMsg(row.content, row.author, false, row.created_at);
+
+                if (msg.event === 'postgres_changes') {
+                    const record = msg.payload?.data?.record;
+                    if (record && !seenIds.has(record.id)) {
+                        seenIds.add(record.id);
+                        if (record.author !== visitorName) {
+                            addMsg(record.content, record.author, false, record.created_at);
+                        }
                     }
                 }
             } catch(e) {}
         };
 
         realtimeSocket.onclose = () => {
+            clearInterval(heartbeatInterval);
             statusDot.style.background = '#dd4422';
             statusDot.title = 'Disconnected';
+            setTimeout(() => {
+                if (realtimeSocket && realtimeSocket.readyState === WebSocket.CLOSED) {
+                    connectRealtime();
+                }
+            }, 3000);
+        };
+
+        realtimeSocket.onerror = (e) => {
+            console.error('[Lyra WS onerror]', e);
+            statusDot.style.background = '#dd4422';
         };
     }
 
@@ -834,7 +854,11 @@ function buildChatSurface(container, p) {
 
     // ── Cleanup on leave ──────────────────────────────────────────────
     container._cleanup = () => {
-        if (realtimeSocket) { realtimeSocket.close(); realtimeSocket = null; }
+        if (realtimeSocket) {
+            realtimeSocket.onclose = null; // prevent reconnect loop on intentional close
+            realtimeSocket.close();
+            realtimeSocket = null;
+        }
     };
 
     // ── Boot ──────────────────────────────────────────────────────────
