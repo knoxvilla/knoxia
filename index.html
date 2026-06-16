@@ -13,61 +13,188 @@
             }
         }
     </script>
+    <link rel="stylesheet" href="os.css">
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Tahoma', sans-serif; color: white; }
-        canvas { display: block; }
-        #os-screen-canvas { display: none; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: white;
+        }
 
-        /* UI Overlay */
-        #ui-overlay { position: fixed; top: 40px; left: 40px; z-index: 100; transition: opacity 1s ease; }
-        .top-left-meta { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
-        
+        canvas { display: block; }
+
+        /* ── Intro overlay ── */
+        #ui-overlay {
+            position: fixed;
+            top: 40px;
+            left: 40px;
+            z-index: 100;
+        }
+
+        .top-left-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
         #enter-btn {
-            padding: 12px 28px; font-size: 13px; font-weight: bold; color: white;
-            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.3);
-            cursor: pointer; transition: all 0.3s ease; letter-spacing: 2px;
+            padding: 12px 28px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 2px;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
         #enter-btn:hover { background: white; color: black; }
 
-        .credits { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.6; opacity: 0.7; }
+        .credits {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            line-height: 1.6;
+            opacity: 0.7;
+        }
         .credits p { margin: 0; }
-        .credits a { color: white; text-decoration: none; border-bottom: 1px solid rgba(255, 255, 255, 0.3); }
+        .credits a { color: white; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
         .credits a:hover { border-bottom-color: white; }
 
-        #info-btn { background: none; border: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.5); padding: 5px 15px; font-size: 10px; cursor: pointer; transition: 0.3s; }
+        #info-btn {
+            background: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.5);
+            padding: 5px 15px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
         #info-btn:hover { border-color: white; color: white; }
 
-        /* Modal */
-        #info-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: opacity 0.4s ease; }
+        /* ── Info modal ── */
+        #info-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.4s ease;
+        }
         .modal-hidden { opacity: 0; pointer-events: none; }
-        .modal-content { width: 100%; max-width: 400px; padding: 40px; border: 1px solid rgba(255,255,255,0.2); background: black; text-align: left; }
+        .modal-content {
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: black;
+            text-align: left;
+        }
         .modal-content h2 { margin: 0 0 20px 0; letter-spacing: 4px; font-weight: normal; }
-        #close-info { margin-top: 20px; background: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
+        #close-info {
+            margin-top: 20px;
+            background: white;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* ── Transition overlay ── */
+        #transition-overlay {
+            position: fixed;
+            inset: 0;
+            background: black;
+            z-index: 300;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* ── CRT canvas ── */
+        #crt-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 400;
+            display: none;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+
+    <!-- 3D Scene -->
+    <canvas id="monitor-canvas"></canvas>
+
+    <!-- Intro UI -->
     <div id="ui-overlay">
         <div class="top-left-meta">
-            <button id="enter-btn">ENTER EXPERIENCES</button>
+            <button id="enter-btn">ENTER EXPERIENCE</button>
             <div class="credits">
                 <p>Made by <strong>Ramsey Knox</strong></p>
-                <p>Model by <a href="https://sketchfab.com/3d-models/rm-c-series-computer-read-desc-739bcfabdd244375b37010701d43b86d" target="_blank">Charlie Chapelton</a></p>
+                <p>CRT Model by <a href="https://sketchfab.com/3d-models/rm-c-series-computer-read-desc-739bcfabdd244375b37010701d43b86d" target="_blank">Charlie Chapelton</a></p>
             </div>
             <button id="info-btn">INFO</button>
         </div>
     </div>
 
+    <!-- Info modal -->
     <div id="info-modal" class="modal-hidden">
         <div class="modal-content">
-            <h2>KNOXIA OS</h2>
-            <p>An interactive digital archive exploring mid-2000s hardware aesthetics.</p>
-            <p>Click the monitor's physical power button to initiate the boot sequence once the camera has docked.</p>
+            <h2>KnoxiaOS</h2>
+            <p>An interactive digital archive of Ramsey Knox's music.</p>
+            <p>Click Enter Experience to boot KnoxiaOS.</p>
+            <p>To shut down, click the globe in the top-left and select Shut Down.</p>
+            <p>Thanks to Charlie Chapelton for the CRT 3D model.</p>
+            <p>With love,</p>
+            <p>Knox.</p>
             <button id="close-info">RETURN</button>
         </div>
     </div>
 
-    <canvas id="monitor-canvas"></canvas>
-    <canvas id="os-screen-canvas" width="1024" height="768"></canvas>
+    <!-- Transition overlay -->
+    <div id="transition-overlay"></div>
+
+    <!-- CRT canvas -->
+    <canvas id="crt-canvas"></canvas>
+
+    <!-- OS Layer -->
+    <div id="os-layer">
+
+        <!-- Menubar (built by os.js) -->
+        <div id="menubar"></div>
+
+        <!-- Desktop -->
+        <div id="desktop"></div>
+
+        <!-- App Menu (built by os.js, shown above dock) -->
+        <div id="app-menu"></div>
+
+        <!-- Dock (built by os.js) -->
+        <div id="dock-container">
+            <div id="dock"></div>
+        </div>
+
+        <!-- Legacy elements hidden by CSS (os.js still references them safely) -->
+        <div id="taskbar" style="display:none;"></div>
+        <div id="start-menu" style="display:none;"></div>
+        <div id="taskbar-windows" style="display:none;"></div>
+        <div id="system-tray" style="display:none;"></div>
+        <div id="clock" style="display:none;"></div>
+
+    </div>
+
+    <script src="orbit.js"></script>
+    <script src="os.js"></script>
     <script type="module" src="main.js"></script>
+
 </body>
 </html>

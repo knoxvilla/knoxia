@@ -1,0 +1,1124 @@
+/* =============================================
+   KnoxiaOS — Aqua Y2K Style
+   Font: Helvetica Neue / Arial
+   ============================================= */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── OS Layer ─────────────────────────────── */
+
+#os-layer {
+    position: fixed;
+    inset: 0;
+    display: none;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 11px;
+    overflow: hidden;
+    z-index: 200;
+}
+
+/* scanlines removed */
+
+/* ── Desktop ──────────────────────────────── */
+
+#desktop {
+    position: absolute;
+    top: 22px;
+    left: 0;
+    right: 0;
+    bottom: 58px;
+    background-image: url('./wallpaper.jpg');
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+}
+
+/* ── Desktop Icons ────────────────────────── */
+
+.desktop-icon {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 72px;
+    cursor: pointer;
+    padding: 6px 4px 4px;
+    border-radius: 8px;
+}
+
+.desktop-icon:hover {
+    background: rgba(255,255,255,0.15);
+}
+
+.desktop-icon.selected {
+    background: rgba(50,100,200,0.35);
+}
+
+.desktop-icon .icon-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.desktop-icon span {
+    color: white;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.6);
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+/* ── Menubar ──────────────────────────────── */
+
+#menubar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 22px;
+    z-index: 9000;
+    background: linear-gradient(180deg,
+        rgba(245,248,255,0.97) 0%,
+        rgba(215,228,248,0.95) 50%,
+        rgba(200,218,242,0.93) 100%
+    );
+    border-bottom: 1px solid rgba(100,140,200,0.4);
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+
+#menubar-globe {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+    background: conic-gradient(from 0deg, #1a44aa, #44aaff, #1a44aa, #0e2a6a, #44aaff, #1a44aa);
+    border: 1px solid #0e2a6a;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+#menubar-globe::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    width: 6px;
+    height: 5px;
+    background: rgba(255,255,255,0.45);
+    border-radius: 50%;
+    transform: rotate(-20deg);
+}
+
+.menubar-item {
+    font-size: 11px;
+    color: #111827;
+    font-weight: 500;
+    padding: 0 7px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.menubar-item:hover {
+    background: rgba(50,90,200,0.14);
+}
+
+.menubar-item.brand {
+    font-weight: 700;
+    font-size: 12px;
+    cursor: default;
+}
+
+.menubar-item.brand:hover {
+    background: none;
+}
+
+#menubar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#clock {
+    font-size: 11px;
+    font-weight: 600;
+    color: #1a2a4a;
+    white-space: nowrap;
+}
+
+/* ── Dock ─────────────────────────────────── */
+
+#dock-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 62px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 8500;
+}
+
+#dock {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    padding: 6px 14px 5px;
+    background: linear-gradient(180deg, rgba(200,220,255,0.2), rgba(160,190,240,0.12));
+    border: 1px solid rgba(255,255,255,0.24);
+    border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    position: relative;
+}
+
+#dock::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 1px;
+    background: rgba(255,255,255,0.38);
+}
+
+.dock-sep {
+    width: 1px;
+    height: 30px;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,0.32), transparent);
+    margin: 0 3px;
+    align-self: center;
+    flex-shrink: 0;
+}
+
+.dock-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35);
+    transition: transform 0.1s ease;
+}
+
+.dock-icon:hover {
+    transform: scale(1.2) translateY(-4px);
+}
+
+/* Glass sheen on icons */
+.dock-icon::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 52%;
+    background: rgba(255,255,255,0.22);
+    border-radius: 10px 10px 0 0;
+    pointer-events: none;
+}
+
+.dock-icon.active-app::before {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.8);
+    box-shadow: 0 0 4px rgba(255,255,255,0.6);
+    z-index: 2;
+}
+
+/* Icon color themes */
+.dock-icon.ic-blue   { background: linear-gradient(145deg, #5599ee, #2266bb); }
+.dock-icon.ic-sky    { background: linear-gradient(145deg, #88ccff, #3399dd); }
+.dock-icon.ic-gold   { background: linear-gradient(145deg, #ffdd55, #cc9911); }
+.dock-icon.ic-red    { background: linear-gradient(145deg, #ff8866, #cc3311); }
+.dock-icon.ic-green  { background: linear-gradient(145deg, #88ddaa, #33aa66); }
+.dock-icon.ic-purple { background: linear-gradient(145deg, #ccaaff, #8855cc); }
+.dock-icon.ic-gray   { background: linear-gradient(145deg, #ccd8e8, #8899b0); }
+
+/* ── Start/App Menu ─────────────────────────── */
+
+#app-menu {
+    position: absolute;
+    bottom: 62px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 260px;
+    background: linear-gradient(180deg, rgba(220,232,252,0.97), rgba(200,218,245,0.97));
+    border: 1px solid rgba(100,140,210,0.5);
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5);
+    z-index: 9200;
+    display: none;
+    overflow: hidden;
+}
+
+#app-menu.open {
+    display: block;
+}
+
+.app-menu-header {
+    height: 44px;
+    background: linear-gradient(180deg, #4488ee, #2266cc);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 10px;
+    border-bottom: 1px solid rgba(20,60,140,0.4);
+}
+
+.app-menu-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, #1144aa, #3388ff, #1144aa, #0a2266, #3388ff, #1144aa);
+    border: 2px solid rgba(255,255,255,0.4);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+}
+
+.app-menu-username {
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.app-menu-body {
+    padding: 6px 0;
+}
+
+.app-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #1a2a3a;
+    font-weight: 500;
+}
+
+.app-menu-item:hover {
+    background: linear-gradient(90deg, #3366cc, #4477dd);
+    color: white;
+}
+
+.app-menu-item .menu-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.app-menu-divider {
+    height: 1px;
+    background: rgba(100,140,200,0.25);
+    margin: 4px 8px;
+}
+
+.app-menu-footer {
+    padding: 6px 10px;
+    border-top: 1px solid rgba(100,140,200,0.25);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.app-menu-footer-btn {
+    padding: 4px 14px;
+    background: linear-gradient(180deg, #ee5533, #cc2211);
+    border: 1px solid rgba(140,20,10,0.5);
+    border-radius: 5px;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.app-menu-footer-btn:hover {
+    background: linear-gradient(180deg, #ff6644, #dd3322);
+}
+
+/* Taskbar window buttons (hidden in this design, dock handles it) */
+#taskbar-windows { display: none; }
+#taskbar { display: none; }
+#start-menu { display: none; }
+#system-tray { display: none; }
+#start-btn { display: none; }
+
+/* ── Windows ──────────────────────────────── */
+
+.xp-window {
+    position: absolute;
+    min-width: 220px;
+    min-height: 120px;
+    border: 1px solid rgba(60,90,140,0.4);
+    border-radius: 8px;
+    box-shadow:
+        0 12px 40px rgba(0,0,0,0.55),
+        0 2px 8px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+}
+
+.xp-window.focused {
+    z-index: 1100;
+    box-shadow:
+        0 16px 50px rgba(0,0,0,0.65),
+        0 3px 10px rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+/* ── Titlebar ─────────────────────────────── */
+
+.xp-titlebar {
+    height: 22px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 7px;
+    cursor: move;
+    flex-shrink: 0;
+    position: relative;
+    background:
+        repeating-linear-gradient(
+            180deg,
+            rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 1px,
+            transparent 1px, transparent 2px
+        ),
+        linear-gradient(180deg, #d8e2ee 0%, #c4d0de 35%, #b8c8d8 65%, #bcc8d6 100%);
+    border-bottom: 1px solid rgba(90,120,165,0.4);
+}
+
+.xp-window.unfocused .xp-titlebar {
+    background: linear-gradient(180deg, #e4e8ed 0%, #d8dce4 100%);
+    border-bottom-color: rgba(120,140,170,0.3);
+}
+
+/* Traffic lights */
+.xp-controls {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.xp-btn {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+/* Gloss dot on traffic lights */
+.xp-btn::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 3px;
+    width: 5px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.52);
+    pointer-events: none;
+}
+
+.xp-btn-close {
+    background: radial-gradient(circle at 40% 35%, #ff8888, #dd2222);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+.xp-btn-minimize {
+    background: radial-gradient(circle at 40% 35%, #ffdd44, #cc9900);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+
+.xp-btn-maximize {
+    background: radial-gradient(circle at 40% 35%, #66ee44, #22aa22);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+
+.xp-window.unfocused .xp-btn-close    { background: #c0b0b0; box-shadow: none; }
+.xp-window.unfocused .xp-btn-minimize { background: #c0c0b0; box-shadow: none; }
+.xp-window.unfocused .xp-btn-maximize { background: #b0c0b0; box-shadow: none; }
+
+.xp-btn:hover { filter: brightness(1.1); }
+.xp-btn:active { filter: brightness(0.85); }
+
+/* Window title — centered, never overlaps traffic lights */
+.xp-titlebar-title {
+    position: absolute;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1a2a3a;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 60px; /* clear the traffic lights on both sides */
+    pointer-events: none;
+}
+
+.xp-window.unfocused .xp-titlebar-title {
+    color: #7a8a9a;
+    text-shadow: none;
+}
+
+/* Hide old icon in titlebar */
+.xp-titlebar-icon { display: none; }
+
+/* ── Window Body ──────────────────────────── */
+
+.xp-window-body {
+    flex: 1;
+    background: rgba(234,240,250,0.98);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* ── Menubar (inside windows) ─────────────── */
+
+.xp-menubar {
+    height: 20px;
+    background: linear-gradient(180deg, #eef4fc, #e4eef8);
+    border-bottom: 1px solid rgba(100,130,180,0.3);
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.xp-menubar-item {
+    padding: 1px 7px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+    color: #1a2a3a;
+    font-weight: 500;
+}
+
+.xp-menubar-item:hover {
+    background: linear-gradient(180deg, #4488ee, #2266cc);
+    color: white;
+}
+
+/* ── Toolbar ──────────────────────────────── */
+
+.xp-toolbar {
+    height: 30px;
+    background: linear-gradient(180deg, #e8eef8, #d8e4f0);
+    border-bottom: 1px solid rgba(100,130,180,0.3);
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.xp-toolbar-btn {
+    height: 20px;
+    padding: 0 8px;
+    background: linear-gradient(180deg, #f0f4fc, #d8e2f0);
+    border: 1px solid rgba(80,120,180,0.38);
+    border-radius: 4px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    color: #2a3a5a;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.7), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.xp-toolbar-btn:hover {
+    background: linear-gradient(180deg, #fff, #e4eeff);
+    border-color: rgba(50,100,200,0.5);
+}
+
+.xp-toolbar-btn:active {
+    background: linear-gradient(180deg, #d4e0f4, #e4eeff);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ── Status Bar ───────────────────────────── */
+
+.xp-statusbar {
+    height: 18px;
+    background: linear-gradient(180deg, #d8e4f0, #c8d8e8);
+    border-top: 1px solid rgba(100,130,180,0.3);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 10px;
+    color: #3a5070;
+    flex-shrink: 0;
+    gap: 8px;
+}
+
+.xp-statusbar-panel {
+    font-size: 10px;
+    color: #3a5070;
+}
+
+/* ── Notepad ──────────────────────────────── */
+
+.notepad-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    border: none;
+    outline: none;
+    padding: 8px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    background: white;
+    color: #1a2a3a;
+    line-height: 1.6;
+}
+
+/* ── Explorer ─────────────────────────────── */
+
+.explorer-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.explorer-sidebar {
+    width: 110px;
+    background: linear-gradient(180deg, #c0d0e4, #b0c0d4);
+    border-right: 1px solid rgba(80,110,160,0.35);
+    padding: 8px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.explorer-sidebar-section {
+    margin-bottom: 10px;
+}
+
+.explorer-sidebar-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: #4a6080;
+    padding: 0 8px 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: block;
+}
+
+.explorer-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #1a2a3a;
+}
+
+.explorer-sidebar-item:hover {
+    background: rgba(255,255,255,0.25);
+}
+
+.explorer-sidebar-item.active {
+    background: linear-gradient(90deg, #3366cc, #4477dd);
+    color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.explorer-main {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+}
+
+.explorer-address-bar {
+    height: 26px;
+    background: linear-gradient(180deg, #eef4fc, #e4eef8);
+    border-bottom: 1px solid rgba(100,130,180,0.3);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.explorer-address-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #3a5070;
+    white-space: nowrap;
+}
+
+.explorer-address-input {
+    flex: 1;
+    height: 17px;
+    border: 1px solid rgba(80,120,180,0.4);
+    border-radius: 3px;
+    background: white;
+    padding: 0 6px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 10px;
+    color: #2a3a5a;
+    outline: none;
+}
+
+.explorer-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+}
+
+.explorer-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 68px;
+    padding: 6px 4px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 500;
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.3;
+    color: #1a2a3a;
+}
+
+.explorer-item:hover {
+    background: rgba(50,100,200,0.1);
+}
+
+.explorer-item.selected {
+    background: rgba(50,100,200,0.2);
+}
+
+.explorer-item.selected span {
+    background: #3366cc;
+    color: white;
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+.explorer-item-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Gloss on explorer icons */
+.explorer-item-icon::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50%;
+    background: rgba(255,255,255,0.22);
+    border-radius: 7px 7px 0 0;
+    pointer-events: none;
+}
+
+/* ── Music Player ─────────────────────────── */
+
+.player-body {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    gap: 7px;
+    background: linear-gradient(180deg, #ccd6e4, #b8c4d2);
+    flex: 1;
+}
+
+.player-lcd {
+    background: #050d14;
+    border-radius: 6px;
+    padding: 8px 10px;
+    border: 1px solid #000;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.player-lcd-track {
+    font-size: 10px;
+    font-weight: 700;
+    color: #55bbff;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 1px;
+}
+
+.player-lcd-time {
+    font-size: 8px;
+    color: #44aaff;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.player-eq {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 18px;
+    margin-bottom: 4px;
+}
+
+.player-eq-bar {
+    flex: 1;
+    border-radius: 1px 1px 0 0;
+    min-height: 2px;
+    background: linear-gradient(180deg, #55ccff, #1166aa);
+    transition: height 0.05s ease;
+}
+
+.player-progress-track {
+    height: 3px;
+    background: #0a1a2a;
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+}
+
+.player-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2266dd, #44aaff);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.player-controls {
+    display: flex;
+    gap: 3px;
+}
+
+.player-btn {
+    flex: 1;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    cursor: pointer;
+    background: linear-gradient(180deg, #dce8f8, #c0cede);
+    border: 1px solid rgba(80,120,180,0.4);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.7), inset 0 1px 0 rgba(255,255,255,0.4);
+    color: #1a2a4a;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.player-btn:hover {
+    background: linear-gradient(180deg, #eef4ff, #d0dcee);
+}
+
+.player-btn:active,
+.player-btn.active {
+    background: linear-gradient(180deg, #4488ee, #2260bb);
+    border-color: rgba(20,60,140,0.6);
+    color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.player-volume {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.player-volume-label {
+    font-size: 8px;
+    font-weight: 700;
+    color: #3a5070;
+    width: 22px;
+    flex-shrink: 0;
+}
+
+.player-volume-slider {
+    flex: 1;
+    height: 3px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+}
+
+.player-volume-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3377cc, #55aaee);
+    border-radius: 2px;
+}
+
+/* ── System Info ──────────────────────────── */
+
+.sysinfo-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: linear-gradient(180deg, #eef4fc, #e4eef8);
+    flex: 1;
+    overflow-y: auto;
+    text-align: center;
+}
+
+.sysinfo-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(100,140,200,0.25);
+    margin-bottom: 10px;
+}
+
+.sysinfo-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, #1144aa, #3388ff, #1144aa, #0a2266, #3388ff, #1144aa);
+    border: 2px solid #0a2266;
+    box-shadow: 0 3px 12px rgba(0,50,180,0.5), inset 0 2px 0 rgba(255,255,255,0.3);
+    flex-shrink: 0;
+    position: relative;
+}
+
+.sysinfo-os-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0a1a2a;
+    letter-spacing: -0.01em;
+}
+
+.sysinfo-os-version {
+    font-size: 10px;
+    color: #4a6a8a;
+    font-weight: 500;
+}
+
+.sysinfo-row {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    padding: 3px 0;
+    text-align: left;
+    border-bottom: 1px solid rgba(100,140,200,0.1);
+}
+
+.sysinfo-label {
+    color: #4a6a8a;
+    width: 100px;
+    flex-shrink: 0;
+    font-weight: 500;
+}
+
+.sysinfo-value {
+    color: #1a2a3a;
+    font-weight: 600;
+}
+
+/* ── Scrollbars ───────────────────────────── */
+
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(200,215,235,0.5);
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #b0c4dc, #98aec8);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #98b0cc, #8098b8);
+    background-clip: padding-box;
+}
+
+/* ── Additions / fixes ────────────────────── */
+
+/* Unified Aqua icon (generated by makeIcon()) */
+.aqua-icon { flex-shrink: 0; }
+
+/* Menubar right side */
+.menubar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+.menubar-icon {
+    font-size: 13px;
+    cursor: default;
+}
+
+/* Dock icon — position:relative needed for running dot */
+.dock-icon {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+    transition: transform 0.1s ease;
+    overflow: visible !important; /* let dot show below */
+}
+
+.dock-icon:hover {
+    transform: scale(1.18) translateY(-4px);
+}
+
+.dock-icon.dock-focused {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.35);
+}
+
+/* Running app dot below dock icon */
+.running-dot {
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    box-shadow: 0 0 4px rgba(255,255,255,0.6);
+    pointer-events: none;
+}
+
+/* Volume knob on player */
+.player-volume-knob {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #f0f4fc, #c8d4e4);
+    border: 1px solid rgba(80,120,180,0.5);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    cursor: pointer;
+    pointer-events: none; /* drag handled by parent */
+}
+
+/* Sysinfo divider */
+.sysinfo-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(80,120,180,0.3), transparent);
+    margin: 8px 0;
+}
+
+/* Player play button accent */
+.player-btn-play {
+    background: linear-gradient(180deg, #4488ee, #2260bb) !important;
+    border-color: rgba(20,60,140,0.6) !important;
+    color: white !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+.player-btn-play.active,
+.player-btn.active {
+    background: linear-gradient(180deg, #2a5acc, #1a44aa) !important;
+    color: white !important;
+}
+
+/* Explorer item icon wrapper */
+.explorer-item-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Desktop icon img wrapper uses makeIcon directly, no separate bg needed */
+.desktop-icon .icon-img {
+    width: 36px;
+    height: 36px;
+}
+
+/* Green button restore indicator */
+.xp-btn-maximize {
+    font-size: 8px;
+    line-height: 1;
+    color: rgba(0,60,0,0.7);
+}
