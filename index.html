@@ -22,24 +22,20 @@
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: white;
         }
-
         canvas { display: block; }
 
-        /* ── Intro overlay ── */
         #ui-overlay {
             position: fixed;
             top: 40px;
             left: 40px;
             z-index: 100;
         }
-
         .top-left-meta {
             display: flex;
             flex-direction: column;
             gap: 20px;
             align-items: flex-start;
         }
-
         #enter-btn {
             padding: 12px 28px;
             font-size: 13px;
@@ -53,7 +49,6 @@
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
         #enter-btn:hover { background: white; color: black; }
-
         .credits {
             font-size: 11px;
             text-transform: uppercase;
@@ -64,7 +59,6 @@
         .credits p { margin: 0; }
         .credits a { color: white; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
         .credits a:hover { border-bottom-color: white; }
-
         #info-btn {
             background: none;
             border: 1px solid rgba(255,255,255,0.2);
@@ -76,8 +70,6 @@
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
         }
         #info-btn:hover { border-color: white; color: white; }
-
-        /* ── Info modal ── */
         #info-modal {
             position: fixed;
             inset: 0;
@@ -106,8 +98,6 @@
             font-weight: bold;
             cursor: pointer;
         }
-
-        /* ── Transition overlay ── */
         #transition-overlay {
             position: fixed;
             inset: 0;
@@ -116,8 +106,6 @@
             opacity: 0;
             pointer-events: none;
         }
-
-        /* ── CRT canvas ── */
         #crt-canvas {
             position: fixed;
             inset: 0;
@@ -131,10 +119,8 @@
 </head>
 <body>
 
-    <!-- 3D Scene -->
     <canvas id="monitor-canvas"></canvas>
 
-    <!-- Intro UI -->
     <div id="ui-overlay">
         <div class="top-left-meta">
             <button id="enter-btn">ENTER EXPERIENCE</button>
@@ -146,13 +132,12 @@
         </div>
     </div>
 
-    <!-- Info modal -->
     <div id="info-modal" class="modal-hidden">
         <div class="modal-content">
             <h2>KnoxiaOS</h2>
             <p>An interactive digital archive of Ramsey Knox's music.</p>
             <p>Click Enter Experience to boot KnoxiaOS.</p>
-            <p>To shut down, click the globe in the top-left and select Shut Down.</p>
+            <p>To shut down, open the Start menu and click Turn Off Computer.</p>
             <p>Thanks to Charlie Chapelton for the CRT 3D model.</p>
             <p>With love,</p>
             <p>Knox.</p>
@@ -160,36 +145,26 @@
         </div>
     </div>
 
-    <!-- Transition overlay -->
     <div id="transition-overlay"></div>
-
-    <!-- CRT canvas -->
     <canvas id="crt-canvas"></canvas>
 
-    <!-- OS Layer -->
+    <!-- OS Layer — XP structure, all built by os.js -->
     <div id="os-layer">
-
-        <!-- Menubar (built by os.js) -->
-        <div id="menubar"></div>
-
-        <!-- Desktop -->
         <div id="desktop"></div>
 
-        <!-- App Menu (built by os.js, shown above dock) -->
-        <div id="app-menu"></div>
+        <!-- Start menu — built by os.js -->
+        <div id="start-menu"></div>
 
-        <!-- Dock (built by os.js) -->
-        <div id="dock-container">
-            <div id="dock"></div>
-        </div>
+        <!-- Taskbar — built by os.js -->
+        <div id="taskbar"></div>
 
-        <!-- Legacy elements hidden by CSS (os.js still references them safely) -->
-        <div id="taskbar" style="display:none;"></div>
-        <div id="start-menu" style="display:none;"></div>
+        <!-- Hidden legacy stubs so os.js refs don't break -->
+        <div id="menubar"         style="display:none;"></div>
+        <div id="app-menu"        style="display:none;"></div>
+        <div id="dock-container"  style="display:none;"><div id="dock"></div></div>
         <div id="taskbar-windows" style="display:none;"></div>
-        <div id="system-tray" style="display:none;"></div>
-        <div id="clock" style="display:none;"></div>
-
+        <div id="system-tray"     style="display:none;"></div>
+        <div id="clock"           style="display:none;"></div>
     </div>
 
     <script src="orbit.js"></script>

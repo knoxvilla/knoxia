@@ -117,8 +117,55 @@ window.addEventListener('DOMContentLoaded', () => {
         mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     });
 
-    // ═════════════════════════════════════════════════════════════════════
-    // SCENE B — Star tunnel: the "room" inside the monitor
+    // ── TUNNEL STARS IN SCENE A ───────────────────────────────────────────
+    // The star tunnel lives in sceneA, starting just behind the monitor screen
+    // (z ≈ -2) and extending deep into negative Z. This means cameraA can fly
+    // through it continuously — no scene swap, no cuts.
+    let tunnelStarsA = null;
+    const TUNNEL_A_LENGTH = 2400;
+    const TUNNEL_A_RADIUS = 500;
+    const TUNNEL_A_START  = -2; // just behind the monitor screen face
+
+    (function buildTunnelStarsInSceneA() {
+        const COUNT = 5000;
+        const geo   = new THREE.BufferGeometry();
+        const mat   = new THREE.PointsMaterial({
+            size: 1.4, transparent: true, opacity: 0,
+            sizeAttenuation: true, depthWrite: false, color: 0xffffff,
+        });
+        mat.map = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png');
+        mat.alphaTest = 0.01;
+
+        const positions = [];
+        for (let i = 0; i < COUNT; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r     = Math.pow(Math.random(), 0.5) * TUNNEL_A_RADIUS;
+            positions.push(
+                Math.cos(angle) * r,
+                Math.sin(angle) * r,
+                TUNNEL_A_START - Math.random() * TUNNEL_A_LENGTH
+            );
+        }
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        tunnelStarsA = new THREE.Points(geo, mat);
+        sceneA.add(tunnelStarsA);
+    })();
+
+    function resetTunnelStarsA() {
+        if (!tunnelStarsA) return;
+        const pos = tunnelStarsA.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r     = Math.pow(Math.random(), 0.5) * TUNNEL_A_RADIUS;
+            pos.setXYZ(i,
+                Math.cos(angle) * r,
+                Math.sin(angle) * r,
+                TUNNEL_A_START - Math.random() * TUNNEL_A_LENGTH
+            );
+        }
+        pos.needsUpdate = true;
+        tunnelStarsA.material.opacity = 0;
+    }
     // A deep 3D space the camera flies through. Stars at varying Z depths
     // create genuine parallax — close stars blur past, far ones barely move.
     // ═════════════════════════════════════════════════════════════════════
@@ -166,6 +213,17 @@ window.addEventListener('DOMContentLoaded', () => {
         geo.setAttribute('color',    new THREE.Float32BufferAttribute(c,     3));
         geo.setAttribute('size',     new THREE.Float32BufferAttribute(sizes, 1));
 
+        // Random phase offset per star for independent twinkling
+        const twinkleOffsets = new Float32Array(COUNT);
+        const twinkleSpeeds  = new Float32Array(COUNT);
+        for (let i = 0; i < COUNT; i++) {
+            twinkleOffsets[i] = Math.random() * Math.PI * 2;
+            twinkleSpeeds[i]  = 0.4 + Math.random() * 0.8; // vary speed slightly
+        }
+        geo.userData.twinkleOffsets = twinkleOffsets;
+        geo.userData.twinkleSpeeds  = twinkleSpeeds;
+        geo.userData.baseColors     = new Float32Array(c); // store original colors
+
         const mat = new THREE.PointsMaterial({
             size: 1.8, sizeAttenuation: true,
             transparent: true, opacity: 0,
@@ -199,6 +257,53 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         positions.needsUpdate = true;
         starFieldB.material.opacity = 0;
+    }
+
+    // ── OS PREVIEW SCREEN — what we crash into ────────────────────────────
+    // A floating "monitor" showing the real desktop wallpaper, planted at
+    // the far end of the tunnel dead ahead of the camera. We fly straight
+    // at it, it grows into a glowing portal, then we punch through it into
+    // the actual OS — instead of just blacking out into a flat white flash.
+    let osScreenMesh, osScreenGlow;
+    const OS_SCREEN_Z = -(TUNNEL_LENGTH * 0.92 + 70);
+
+    (function buildOSPreviewScreen() {
+        const screenTex = new THREE.TextureLoader().load('./wallpaper.jpg');
+        screenTex.colorSpace = THREE.SRGBColorSpace;
+
+        const screenW = 130, screenH = screenW * 0.625; // 16:10, matches the desktop
+        const screenMat = new THREE.MeshBasicMaterial({
+            map: screenTex, transparent: true, opacity: 0, toneMapped: false,
+        });
+        osScreenMesh = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenMat);
+        osScreenMesh.position.set(0, 0, OS_SCREEN_Z);
+        sceneB.add(osScreenMesh);
+
+        // Soft additive glow halo bleeding out from behind the screen
+        const gc = document.createElement('canvas');
+        gc.width = gc.height = 256;
+        const gctx = gc.getContext('2d');
+        const grad = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        grad.addColorStop(0,   'rgba(150,195,255,0.95)');
+        grad.addColorStop(0.5, 'rgba(90,150,255,0.35)');
+        grad.addColorStop(1,   'rgba(40,80,200,0)');
+        gctx.fillStyle = grad;
+        gctx.fillRect(0, 0, 256, 256);
+
+        const glowMat = new THREE.MeshBasicMaterial({
+            map: new THREE.CanvasTexture(gc), transparent: true, opacity: 0,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+        });
+        osScreenGlow = new THREE.Mesh(new THREE.PlaneGeometry(screenW * 2.4, screenH * 2.4), glowMat);
+        osScreenGlow.position.set(0, 0, OS_SCREEN_Z - 4);
+        sceneB.add(osScreenGlow);
+    })();
+
+    // Re-arms the preview screen so each entry into the star room is fresh
+    function resetOSPreviewScreen() {
+        osScreenMesh.material.opacity = 0;
+        osScreenGlow.material.opacity = 0;
+        osScreenMesh.rotation.set(0, 0, 0);
     }
 
     // ── SPACE CORE easter egg ─────────────────────────────────────────────
@@ -310,23 +415,71 @@ window.addEventListener('DOMContentLoaded', () => {
         gsap.to(uiOverlay, { opacity:0, duration:0.5, onComplete:() => { uiOverlay.style.display='none'; } });
         gsap.to(introLight, { intensity:2, duration:1.8 });
 
-        // Zoom into monitor. We don't wait for the zoom to finish —
-        // the moment the monitor fills most of the view (z < 6.8) we swap
-        // to the star scene. This makes the join seamless.
-        let sceneSwapped = false;
-        gsap.to(cameraA.position, {
-            x:0, y:0, z:3.5,
-            duration:2.3, ease:'expo.in',
-            onUpdate: () => {
-                cameraA.lookAt(0,0,0);
-                if (!sceneSwapped && cameraA.position.z < 6.8) {
-                    sceneSwapped = true;
-                    enterStarRoom();
-                }
-            },
-        });
+        // ── Step 1: Fade star preview onto monitor screen via canvas blend ──
+        // We keep the screen mesh on screenTexture (never transparent).
+        // Instead we draw the render target into a temp canvas and blend
+        // it onto screenCanvas using globalAlpha — clean fade, no flash.
+        if (window._previewRT && window._previewCam && window._screenMesh) {
+            resetStarFieldB();
+            starFieldB.material.opacity = 0.9;
+
+            // Render one frame into the RT
+            window._previewCam.position.copy(cameraA.position);
+            window._previewCam.quaternion.copy(cameraA.quaternion);
+            window._previewCam.fov    = cameraA.fov;
+            window._previewCam.aspect = 512 / 384;
+            window._previewCam.updateProjectionMatrix();
+            monitorGroup.visible = false;
+            renderer.setRenderTarget(window._previewRT);
+            renderer.render(sceneA, window._previewCam);
+            renderer.setRenderTarget(null);
+            monitorGroup.visible = true;
+
+            // Start live rendering and flag for fade
+            window._previewLive     = true;
+            window._previewAlpha    = 0;
+            window._previewFadingIn = true;
+
+            // Fade alpha 0→1 over 0.8s, then start zoom
+            gsap.to(window, {
+                _previewAlpha: 1,
+                duration: 0.8,
+                ease: 'power2.out',
+                onComplete: startZoom,
+            });
+        } else {
+            startZoom();
+        }
+
+        // ── Step 2: Camera zooms toward monitor, then enters star scene ───
+        function startZoom() {
+            resetOSPreviewScreen();
+            destroySpaceCore();
+            buildSpaceCore();
+
+            let sceneSwapped = false;
+            gsap.to(cameraA.position, {
+                x: 0, y: 0, z: 3.5,
+                duration: 2.3, ease: 'expo.in',
+                onUpdate: () => {
+                    cameraA.lookAt(0, 0, 0);
+                    if (!sceneSwapped && cameraA.position.z < 6.8) {
+                        sceneSwapped = true;
+                        window._previewLive = false; // stop live render
+                        enterStarRoom();
+                    }
+                },
+            });
+        }
     });
 
+    // Reusable offscreen canvas for render target → screenCanvas blending
+    const previewOffscreen    = document.createElement('canvas');
+    previewOffscreen.width    = 512;
+    previewOffscreen.height   = 384;
+    const previewOffscreenCtx = previewOffscreen.getContext('2d');
+    window._previewAlpha      = 0;
+    window._previewLive       = false;
     infoBtn.addEventListener('click',   () => infoModal.classList.remove('modal-hidden'));
     closeInfo.addEventListener('click', () => infoModal.classList.add('modal-hidden'));
 
@@ -339,6 +492,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         // Reset star field positions back to initial distribution
         resetStarFieldB();
+        resetOSPreviewScreen();
 
         // Spawn space core (60% chance, random position)
         destroySpaceCore();
@@ -355,7 +509,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         // Start the fly-through immediately — no waiting
         flyThroughStars(() => {
-            doWhiteBloom(() => {
+            doScreenCrash(() => {
                 activeScene  = sceneA;
                 activeCamera = cameraA;
                 canvas.style.display = 'none';
@@ -373,6 +527,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
 
                 window.KnoxiaOS.init();
+                window._ambienceTrack = ambientTrack;
             });
         });
 
@@ -391,18 +546,14 @@ window.addEventListener('DOMContentLoaded', () => {
     //
     // Camera moves along -Z. FOV also expands slightly at warp for tunnel feel.
     // startT: where on the 0..1 curve to begin (default 0.45 = already moving well)
-    function flyThroughStars(onComplete, startT = 0.58) {
+    function flyThroughStars(onComplete, startT = 0.58, startZ = 0) {
         const TOTAL_MS    = 5200;
-        const TOTAL_DIST  = TUNNEL_LENGTH * 0.92; // travel almost the full depth
+        const TOTAL_DIST  = TUNNEL_LENGTH * 0.92;
 
-        // Camera velocity state (we drive it manually for the ease curve)
-        // Offset startTime backward so we begin at startT on the curve
-        // This gives us the carry-over momentum from the 3D zoom
         let startTime  = performance.now() - (startT * TOTAL_MS);
 
-        // Subtle camera drift — slight horizontal wobble for immersion
         let driftX = 0, driftY = 0, driftAngle = 0;
-        let camZ = 0;
+        let camZ = startZ; // begin from handed-off depth
         let rafId;
 
         function tick(now) {
@@ -429,6 +580,19 @@ window.addEventListener('DOMContentLoaded', () => {
             // FOV expands smoothly during the latter half of the journey
             cameraB.fov = 75 + Math.pow(Math.max(0, (t - 0.5) / 0.5), 2) * 28;
             cameraB.updateProjectionMatrix();
+
+            // The OS preview screen grows into view dead ahead — this is the
+            // target we're flying toward. It fades in, wobbles gently like a
+            // beacon, then settles dead-still as we lock onto it for impact.
+            if (t > 0.4) {
+                const screenT = Math.min((t - 0.4) / 0.5, 1);
+                const smooth  = screenT * screenT * (3 - 2 * screenT);
+                osScreenMesh.material.opacity = smooth;
+                osScreenGlow.material.opacity = smooth * 0.85 * (0.85 + 0.15 * Math.sin(now * 0.004));
+                const settle = 1 - smooth * 0.7;
+                osScreenMesh.rotation.y = Math.sin(now * 0.0006) * 0.05 * settle;
+                osScreenMesh.rotation.x = Math.cos(now * 0.0004) * 0.03 * settle;
+            }
 
             // Star field opacity fades out at warp peak → white takes over
             if (t > 0.88) {
@@ -464,39 +628,104 @@ window.addEventListener('DOMContentLoaded', () => {
         rafId = requestAnimationFrame(tick);
     }
 
-    // ── White bloom ────────────────────────────────────────────────────────
-    // Renders on top of the 3D canvas using the crtCanvas overlay
-    function doWhiteBloom(onComplete) {
+    // ── Screen crash ──────────────────────────────────────────────────────
+    // The camera makes a final hard lunge straight through the OS preview
+    // screen — FOV slams in, the screen blows out bright, the camera shakes
+    // on impact — then a radial flash burst covers the cut to the real OS.
+    function doScreenCrash(onComplete) {
         crtCanvas.width         = window.innerWidth;
         crtCanvas.height        = window.innerHeight;
         crtCanvas.style.display = 'block';
         crtCanvas.style.opacity = '1';
 
+        const PUNCH_MS = 420;
+        const targetZ  = OS_SCREEN_Z - 160; // overshoot — fly clean through the plane
+
+        gsap.to(cameraB.position, {
+            z: targetZ, duration: PUNCH_MS / 1000, ease: 'power4.in',
+            onUpdate: () => cameraB.lookAt(0, 0, targetZ - 300),
+        });
+        // FOV slams narrow — pure g-force, we cut away before it can recover
+        gsap.to(cameraB, {
+            fov: 46, duration: PUNCH_MS / 1000, ease: 'power3.in',
+            onUpdate: () => cameraB.updateProjectionMatrix(),
+        });
+        // The screen and its glow blow out bright right as we hit it
+        gsap.to(osScreenMesh.material, { opacity: 0, duration: 0.18, delay: 0.16 });
+        gsap.to(osScreenGlow.material, { opacity: 0, duration: 0.18, delay: 0.16 });
+
+        // Camera shake — builds through the lunge
+        const shakeStart = performance.now();
+        (function shakeTick() {
+            const e = performance.now() - shakeStart;
+            if (e >= PUNCH_MS) return;
+            const mag = Math.pow(e / PUNCH_MS, 2) * 2.2;
+            cameraB.position.x += (Math.random() - 0.5) * mag;
+            cameraB.position.y += (Math.random() - 0.5) * mag;
+            requestAnimationFrame(shakeTick);
+        })();
+
+        // Impact flash fires right as the camera reaches the screen
+        setTimeout(() => {
+            playImpactFlash(() => {
+                crtCanvas.style.display = 'none';
+                cameraB.fov = 75;
+                cameraB.updateProjectionMatrix();
+                onComplete();
+            });
+        }, PUNCH_MS * 0.62);
+    }
+
+    // ── Impact flash ───────────────────────────────────────────────────────
+    // Radial speed-line burst + white blowout, drawn on the crtCanvas overlay
+    function playImpactFlash(onComplete) {
         const w = crtCanvas.width, h = crtCanvas.height;
-        const BLOOM_IN  = 140;
-        const HOLD      = 80;
-        const BLOOM_OUT = 380;
-        const start     = performance.now();
+        const cx = w / 2, cy = h / 2;
+        const streaks = Array.from({ length: 48 }, (_, i) => ({
+            angle: Math.random() * Math.PI * 2,
+            len:   0.45 + (i % 6) * 0.12,
+        }));
+
+        const STREAK_MS = 110, FLASH_IN = 70, HOLD = 70, FLASH_OUT = 360;
+        const start = performance.now();
 
         // At the same moment, hide the WebGL canvas (OS will appear behind)
-        setTimeout(() => { canvas.style.display = 'none'; }, BLOOM_IN + HOLD);
+        setTimeout(() => { canvas.style.display = 'none'; }, FLASH_IN + HOLD - 10);
 
         function tick(now) {
             const e = now - start;
+            crtCtx.clearRect(0, 0, w, h);
+
+            // Radial speed-line burst, fading as it expands outward
+            const streakT = Math.min(e / STREAK_MS, 1);
+            crtCtx.save();
+            crtCtx.globalCompositeOperation = 'lighter';
+            streaks.forEach((s, i) => {
+                const len   = streakT * Math.max(w, h) * s.len;
+                const x2    = cx + Math.cos(s.angle) * len;
+                const y2    = cy + Math.sin(s.angle) * len;
+                const alpha = (1 - streakT) * 0.6;
+                crtCtx.strokeStyle = i % 3 === 0 ? `rgba(255,255,255,${alpha})` : `rgba(150,200,255,${alpha})`;
+                crtCtx.lineWidth = 1.5;
+                crtCtx.beginPath();
+                crtCtx.moveTo(cx, cy);
+                crtCtx.lineTo(x2, y2);
+                crtCtx.stroke();
+            });
+            crtCtx.restore();
+
+            // White blowout
             let alpha;
-            if      (e < BLOOM_IN)               alpha = e / BLOOM_IN;
-            else if (e < BLOOM_IN + HOLD)         alpha = 1;
+            if      (e < FLASH_IN)        alpha = e / FLASH_IN;
+            else if (e < FLASH_IN + HOLD) alpha = 1;
             else {
-                const t = (e - BLOOM_IN - HOLD) / BLOOM_OUT;
+                const t = (e - FLASH_IN - HOLD) / FLASH_OUT;
                 alpha = 1 - Math.pow(t, 0.6);
-                if (t >= 1) {
-                    crtCanvas.style.display = 'none';
-                    onComplete();
-                    return;
-                }
+                if (t >= 1) { onComplete(); return; }
             }
             crtCtx.fillStyle = `rgba(255,255,255,${alpha})`;
             crtCtx.fillRect(0, 0, w, h);
+
             requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
@@ -572,6 +801,14 @@ window.addEventListener('DOMContentLoaded', () => {
                                     gsap.set(uiOverlay, { opacity: 0 });
                                     gsap.to(uiOverlay,  { opacity: 1, duration: 1.5, ease: 'power2.out' });
                                     gsap.to(introLight, { intensity: 80, duration: 2 });
+                                    // Reset screen mesh back to black canvas texture
+                                    window._previewLive = false;
+                                    if (window._screenMesh && screenTexture) {
+                                        clearScreenCanvas();
+                                        window._screenMesh.material.map     = screenTexture;
+                                        window._screenMesh.material.opacity  = 1;
+                                        window._screenMesh.material.needsUpdate = true;
+                                    }
                                 }
                             });
                         }
@@ -591,7 +828,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (appState !== 'OS_ACTIVE') return;
         appState = 'SHUTTING_DOWN';
 
-        // Stop all audio immediately — prevents buggy re-entry audio
+        // Stop all audio immediately
         if (ambientTrack.isPlaying) ambientTrack.stop();
         ambientTrack.gain.gain.value = 0;
         if (bootSound.isPlaying) bootSound.stop();
@@ -603,75 +840,80 @@ window.addEventListener('DOMContentLoaded', () => {
         crtCanvas.style.display = 'block';
         crtCanvas.style.opacity = '1';
 
-        // 1. CRT flicker
-        playCRTFlicker(() => {
-            // 2. Hide OS, CRT collapse line
-            osLayer.style.display = 'none';
-            playCRTCollapse(() => {
-                // 3. Fade to black
-                gsap.to(transOverlay, {
-                    opacity: 1, duration: 0.4,
-                    onComplete: () => {
-                        // Full reset — everything back to initial state
-                        crtCanvas.style.display = 'none';
-                        crtCtx.clearRect(0, 0, crtCanvas.width, crtCanvas.height);
-                        canvas.style.display = 'block';
+        // Go straight to CRT collapse — no flicker
+        osLayer.style.display = 'none';
+        playCRTCollapse(() => {
+            gsap.to(transOverlay, {
+                opacity: 1, duration: 0.4,
+                onComplete: () => {
+                    // ── Full reset ────────────────────────────────────────
+                    crtCanvas.style.display = 'none';
+                    crtCtx.clearRect(0, 0, crtCanvas.width, crtCanvas.height);
+                    canvas.style.display = 'block';
 
-                        // Destroy space core so it gets re-randomized next entry
-                        destroySpaceCore();
-
-                        // Reset star field so re-entry starts fresh
-                        resetStarFieldB();
-
-                        // Reset both scenes
-                        activeScene  = sceneA;
-                        activeCamera = cameraA;
-                        starFieldB.material.opacity = 0;
-                        cameraB.position.set(0, 0, 0);
-                        cameraB.fov = 75;
-                        cameraB.updateProjectionMatrix();
-
-                        // Reset OS layer — rebuild the static structure, KnoxiaOS.init() will repopulate
-                        osLayer.style.display  = 'none';
-                        osLayer.style.opacity  = '1';
-                        osLayer.innerHTML = `
-                            <div id="menubar"></div>
-                            <div id="desktop"></div>
-                            <div id="app-menu"></div>
-                            <div id="dock-container"><div id="dock"></div></div>
-                            <div id="taskbar" style="display:none;"></div>
-                            <div id="start-menu" style="display:none;"></div>
-                            <div id="taskbar-windows" style="display:none;"></div>
-                            <div id="system-tray" style="display:none;"></div>
-                            <div id="clock" style="display:none;"></div>
-                        `;
-
-                        // Place cameraA just in front of monitor, then zoom out
-                        cameraA.position.set(0, 0, 4.5);
-                        cameraA.lookAt(0, 0, 0);
-
-                        // 4. Fade in 3D scene
-                        gsap.to(transOverlay, {
-                            opacity: 0, duration: 0.6, delay: 0.1,
-                            onComplete: () => {
-                                // 5. Zoom out to menu
-                                gsap.to(cameraA.position, {
-                                    x: menuPos.x, y: menuPos.y, z: menuPos.z,
-                                    duration: 3.0, ease: 'expo.inOut',
-                                    onUpdate:   () => cameraA.lookAt(0, 0, 0),
-                                    onComplete: () => {
-                                        appState = 'INTRO';
-                                        uiOverlay.style.display       = 'flex';
-                                        uiOverlay.style.pointerEvents = 'auto';
-                                        gsap.set(uiOverlay, { opacity: 0 });
-                                        gsap.to(uiOverlay,  { opacity: 1, duration: 1.5, ease: 'power2.out' });
-                                        gsap.to(introLight, { intensity: 80, duration: 2 });
-                                    }
-                                });
-                            }
-                        });
+                    // Reset preview — screen goes black
+                    window._previewLive  = false;
+                    window._previewAlpha = 0;
+                    clearScreenCanvas();
+                    if (window._screenMesh && screenTexture) {
+                        window._screenMesh.material.map = screenTexture;
+                        window._screenMesh.material.needsUpdate = true;
                     }
-                });
+
+                    // Reset space core and star fields
+                    destroySpaceCore();
+                    resetStarFieldB();
+                    resetOSPreviewScreen();
+                    if (typeof tunnelStarsA !== 'undefined' && tunnelStarsA) tunnelStarsA.material.opacity = 0;
+
+                    // Reset both scenes and cameras
+                    activeScene  = sceneA;
+                    activeCamera = cameraA;
+                    starFieldB.material.opacity = 0;
+                    cameraB.position.set(0, 0, 0);
+                    cameraB.fov = 75;
+                    cameraB.updateProjectionMatrix();
+                    if (starFieldA) starFieldA.material.opacity = 0.8;
+
+                    // Reset OS layer to XP structure
+                    osLayer.style.display = 'none';
+                    osLayer.style.opacity = '1';
+                    osLayer.innerHTML = `
+                        <div id="desktop"></div>
+                        <div id="start-menu"></div>
+                        <div id="taskbar"></div>
+                        <div id="menubar"         style="display:none;"></div>
+                        <div id="app-menu"        style="display:none;"></div>
+                        <div id="dock-container"  style="display:none;"><div id="dock"></div></div>
+                        <div id="taskbar-windows" style="display:none;"></div>
+                        <div id="system-tray"     style="display:none;"></div>
+                        <div id="clock"           style="display:none;"></div>
+                    `;
+
+                    // Place camera just in front of monitor then zoom out
+                    cameraA.position.set(0, 0, 4.5);
+                    cameraA.lookAt(0, 0, 0);
+
+                    gsap.to(transOverlay, {
+                        opacity: 0, duration: 0.6, delay: 0.1,
+                        onComplete: () => {
+                            gsap.to(cameraA.position, {
+                                x: menuPos.x, y: menuPos.y, z: menuPos.z,
+                                duration: 3.0, ease: 'expo.inOut',
+                                onUpdate: () => cameraA.lookAt(0, 0, 0),
+                                onComplete: () => {
+                                    appState = 'INTRO';
+                                    uiOverlay.style.display       = 'flex';
+                                    uiOverlay.style.pointerEvents = 'auto';
+                                    gsap.set(uiOverlay, { opacity: 0 });
+                                    gsap.to(uiOverlay,  { opacity: 1, duration: 1.5, ease: 'power2.out' });
+                                    gsap.to(introLight, { intensity: 80, duration: 2 });
+                                    startMonitorIdleEasterEgg();
+                                }
+                            });
+                        }
+                    });
+                }
             });
         });
     });
@@ -853,11 +1095,35 @@ window.addEventListener('DOMContentLoaded', () => {
         monitorGroup.position.y = -3.5;
         monitorGroup.scale.set(0, 0, 0);
 
-        // Map our canvas texture onto the screen mesh
+        // Map canvas texture onto screen mesh (black by default)
         screenTexture = new THREE.CanvasTexture(screenCanvas);
+
+        // ── Render target for star scene preview ──────────────────────────
+        // Created once. We render sceneB into it (one frame, static) when
+        // the user clicks Enter, then show that on the screen mesh.
+        const previewRT = new THREE.WebGLRenderTarget(512, 384, {
+            minFilter: THREE.LinearFilter,
+            magFilter: THREE.LinearFilter,
+        });
+        // Static preview camera — fixed at start of tunnel, never moves
+        const previewCam = new THREE.PerspectiveCamera(75, 512 / 384, 0.1, 3000);
+        previewCam.position.set(0, 0, 0);
+        previewCam.lookAt(0, 0, -1);
+
+        // Store refs for use in enter handler
+        window._previewRT  = previewRT;
+        window._previewCam = previewCam;
+
+        let screenMesh = null;
         monitorGroup.traverse(child => {
             if (child.name === 'RM_Monitor_Type_2_(CRT)_Screen_Surface001_0') {
-                child.material = new THREE.MeshBasicMaterial({ map: screenTexture });
+                child.material = new THREE.MeshBasicMaterial({
+                    map: screenTexture, // starts black
+                    transparent: true,
+                    opacity: 1,
+                });
+                screenMesh = child;
+                window._screenMesh = child;
             }
         });
 
@@ -881,7 +1147,7 @@ window.addEventListener('DOMContentLoaded', () => {
             'what happened to lil pump...',
             'still here? really?',
             '...How About Now?',
-            'gakfsjgklafdsjgakljdhfgjdgkgjdkjgdklgdkdghs4hjafljghadfljghughsairofghiauoh7290456y1074895HEEEEEEEEEEEEEEYYYYYYYHOWUDOING???????????????HIHIHHIHIHIHIHIHNONOEWILLREADTHISPROBABLYBUTAYEIFYOUARE.... ILY <3gasffguhipfghy13r08t1y3804 END OF TRANSMISSIONSYKE LMFAO YALL THOGHT??????? Just enter experience please................................................................................................................................................................................................................................................',
+            'gakfsjgklafdsjgakljdhfgjdgkgjdkjgdklgdkdghs4hjafljghadfljghughsairofghiauoh7290456y1074895HEEEEEEEEEEEEEEYYYYYYYHOWUDOING???????????????HIHIHHIHIHIHIHIHNONOEWILLREADTHISPROBABLYBUTAYEIFYOUARE.... ILY <3gasffguhipfghy13r08t1y3804 END OF TRANSMISSIONSYKE LMFAO YALL THOGHT??????? Just enter experience please....................................................................................................................................................................................................................................................................................',
             'shoutout claude for this',
             'very buggy btw',
             'miley cyrus the goat',
@@ -994,6 +1260,73 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         renderer.render(activeScene, activeCamera);
+
+        // ── Star twinkle ───────────────────────────────────────────────────
+        if (activeScene === sceneB && starFieldB) {
+            const colors  = starFieldB.geometry.attributes.color;
+            const base    = starFieldB.geometry.userData.baseColors;
+            const offsets = starFieldB.geometry.userData.twinkleOffsets;
+            const speeds  = starFieldB.geometry.userData.twinkleSpeeds;
+            const t       = performance.now() * 0.001;
+            // Only update a subset each frame for performance (every 3rd star)
+            for (let i = 0; i < colors.count; i += 3) {
+                const twinkle = 0.75 + Math.sin(t * speeds[i] + offsets[i]) * 0.25;
+                colors.setXYZ(i,
+                    base[i*3]   * twinkle,
+                    base[i*3+1] * twinkle,
+                    base[i*3+2] * twinkle
+                );
+            }
+            colors.needsUpdate = true;
+        }
+
+        // ── Live monitor screen preview ────────────────────────────────────
+        if (window._previewLive && window._previewRT && window._previewCam && monitorGroup) {
+            // Update preview camera to match cameraA
+            window._previewCam.position.copy(cameraA.position);
+            window._previewCam.quaternion.copy(cameraA.quaternion);
+            window._previewCam.fov    = cameraA.fov;
+            window._previewCam.aspect = 512 / 384;
+            window._previewCam.updateProjectionMatrix();
+
+            // Render sceneA (without monitor) into render target
+            monitorGroup.visible = false;
+            renderer.setRenderTarget(window._previewRT);
+            renderer.render(sceneA, window._previewCam);
+            renderer.setRenderTarget(null);
+            monitorGroup.visible = true;
+
+            // Read render target pixels and draw onto screenCanvas with alpha
+            // This keeps the mesh material opaque — no transparent flash ever
+            const alpha = window._previewAlpha ?? 1;
+            const W = screenCanvas.width, H = screenCanvas.height;
+
+            // Black base
+            screenCtx.fillStyle = '#000';
+            screenCtx.fillRect(0, 0, W, H);
+
+            // Draw render target content via a temp ImageData
+            // Three.js render target → read pixels → draw on canvas
+            const pixelBuffer = new Uint8Array(W * H * 4);
+            renderer.readRenderTargetPixels(window._previewRT, 0, 0, W, H, pixelBuffer);
+
+            // Flip Y (WebGL is bottom-up, canvas is top-down)
+            const imageData = new ImageData(W, H);
+            for (let y = 0; y < H; y++) {
+                const srcRow = (H - 1 - y) * W * 4;
+                const dstRow = y * W * 4;
+                imageData.data.set(pixelBuffer.subarray(srcRow, srcRow + W * 4), dstRow);
+            }
+
+            // Draw with alpha blend onto canvas
+            previewOffscreenCtx.putImageData(imageData, 0, 0);
+
+            screenCtx.globalAlpha = alpha;
+            screenCtx.drawImage(previewOffscreen, 0, 0);
+            screenCtx.globalAlpha = 1;
+
+            if (screenTexture) screenTexture.needsUpdate = true;
+        }
     }
 
     window.addEventListener('resize', () => {
