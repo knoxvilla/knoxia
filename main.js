@@ -841,6 +841,7 @@ window.addEventListener('DOMContentLoaded', () => {
         crtCanvas.style.opacity = '1';
 
         // Go straight to CRT collapse — no flicker
+        window._crtCollapseRunning = false;
         osLayer.style.display = 'none';
         playCRTCollapse(() => {
             gsap.to(transOverlay, {
@@ -968,34 +969,61 @@ window.addEventListener('DOMContentLoaded', () => {
     // ── CRT collapse ───────────────────────────────────────────────────────
     // Screen shrinks to a bright horizontal line, then fades
     function playCRTCollapse(onComplete) {
-        const w  = crtCanvas.width, h = crtCanvas.height, cy = h / 2;
+        // Prevent double-running — cancel any existing collapse
+        if (window._crtCollapseRunning) return;
+        window._crtCollapseRunning = true;
+
+        // Ensure canvas is sized
+        if (!crtCanvas.width || !crtCanvas.height) {
+            crtCanvas.width  = window.innerWidth;
+            crtCanvas.height = window.innerHeight;
+        }
+        const w  = crtCanvas.width  || window.innerWidth;
+        const h  = crtCanvas.height || window.innerHeight;
+        const cy = h / 2;
         const COLLAPSE = 200, HOLD = 180, FADE = 320;
         let   phase = 'collapse', phaseStart = performance.now();
 
         function tick(now) {
+            if (!now || !isFinite(now)) { requestAnimationFrame(tick); return; }
+
+            // Hard guard — if dimensions are bad, skip frame
+            if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) {
+                requestAnimationFrame(tick);
+                return;
+            }
+
+            try {
             const e = now - phaseStart;
             crtCtx.fillStyle = 'black';
             crtCtx.fillRect(0, 0, w, h);
 
             if (phase === 'collapse') {
                 const t     = Math.min(e / COLLAPSE, 1);
-                const beamH = Math.max(1, (1 - Math.pow(t, 0.5)) * h);
-                const beamY = cy - beamH / 2;
+                const beamH = Math.max(2, (1 - Math.pow(t, 0.5)) * h);
+                const beamY = Math.max(0, cy - beamH / 2);
+                const y0    = Math.max(0, beamY - 30);
+                const y1    = Math.min(h, beamY + beamH + 30);
 
-                // Phosphor glow
-                const glow = crtCtx.createLinearGradient(0, beamY-30, 0, beamY+beamH+30);
-                glow.addColorStop(0,   'rgba(160,255,185,0)');
-                glow.addColorStop(0.5, `rgba(180,255,200,${(1-t)*0.1})`);
-                glow.addColorStop(1,   'rgba(160,255,185,0)');
-                crtCtx.fillStyle = glow;
-                crtCtx.fillRect(0, beamY-30, w, beamH+60);
+                if (isFinite(y0) && isFinite(y1) && y1 > y0) {
+                    const glow = crtCtx.createLinearGradient(0, y0, 0, y1);
+                    glow.addColorStop(0,   'rgba(160,255,185,0)');
+                    glow.addColorStop(0.5, `rgba(180,255,200,${(1-t)*0.1})`);
+                    glow.addColorStop(1,   'rgba(160,255,185,0)');
+                    crtCtx.fillStyle = glow;
+                    crtCtx.fillRect(0, y0, w, y1 - y0);
+                }
 
-                const core = crtCtx.createLinearGradient(0, beamY, 0, beamY+beamH);
-                core.addColorStop(0,   'rgba(220,255,235,0)');
-                core.addColorStop(0.5, 'rgba(255,255,255,1)');
-                core.addColorStop(1,   'rgba(220,255,235,0)');
-                crtCtx.fillStyle = core;
-                crtCtx.fillRect(0, beamY, w, Math.max(1, beamH));
+                const cy0 = Math.max(0, beamY);
+                const cy1 = Math.min(h, beamY + beamH);
+                if (isFinite(cy0) && isFinite(cy1) && cy1 > cy0) {
+                    const core = crtCtx.createLinearGradient(0, cy0, 0, cy1);
+                    core.addColorStop(0,   'rgba(220,255,235,0)');
+                    core.addColorStop(0.5, 'rgba(255,255,255,1)');
+                    core.addColorStop(1,   'rgba(220,255,235,0)');
+                    crtCtx.fillStyle = core;
+                    crtCtx.fillRect(0, cy0, w, Math.max(2, cy1 - cy0));
+                }
 
                 if (t >= 1) { phase = 'hold'; phaseStart = performance.now(); }
                 requestAnimationFrame(tick);
@@ -1014,17 +1042,26 @@ window.addEventListener('DOMContentLoaded', () => {
                 requestAnimationFrame(tick);
 
             } else {
-                const t = Math.min(e / FADE, 1);
-                const a = Math.pow(1-t, 1.2);
-                const glow = crtCtx.createLinearGradient(0, cy-12, 0, cy+12);
-                glow.addColorStop(0,   'rgba(160,255,185,0)');
-                glow.addColorStop(0.5, `rgba(200,255,220,${a*0.12})`);
-                glow.addColorStop(1,   'rgba(160,255,185,0)');
-                crtCtx.fillStyle = glow; crtCtx.fillRect(0, cy-12, w, 24);
+                const t   = Math.min(e / FADE, 1);
+                const a   = Math.pow(1-t, 1.2);
+                const gy0 = Math.max(0, cy - 12);
+                const gy1 = Math.min(h, cy + 12);
+                if (isFinite(gy0) && isFinite(gy1) && gy1 > gy0) {
+                    const glow = crtCtx.createLinearGradient(0, gy0, 0, gy1);
+                    glow.addColorStop(0,   'rgba(160,255,185,0)');
+                    glow.addColorStop(0.5, `rgba(200,255,220,${a*0.12})`);
+                    glow.addColorStop(1,   'rgba(160,255,185,0)');
+                    crtCtx.fillStyle = glow;
+                    crtCtx.fillRect(0, gy0, w, gy1 - gy0);
+                }
                 crtCtx.fillStyle = `rgba(255,255,255,${a})`;
                 crtCtx.fillRect(0, cy-1, w, 2);
 
-                if (t >= 1) { crtCtx.clearRect(0,0,w,h); onComplete(); return; }
+                if (t >= 1) { crtCtx.clearRect(0,0,w,h); window._crtCollapseRunning = false; onComplete(); return; }
+                requestAnimationFrame(tick);
+            }
+            } catch(err) {
+                // If any drawing fails, skip frame and continue
                 requestAnimationFrame(tick);
             }
         }

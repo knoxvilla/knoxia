@@ -1590,3 +1590,123 @@
     background: linear-gradient(180deg, #d4d0c8, #e8e5dd);
     box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
 }
+
+/* ── Now Playing Toast ────────────────────────── */
+#now-playing-toast {
+    font-family: Tahoma, Verdana, sans-serif;
+}
+
+/* ── Volume Popup ─────────────────────────────── */
+#vol-popup input[type=range] {
+    -webkit-appearance: slider-vertical;
+    writing-mode: vertical-lr;
+    direction: rtl;
+    accent-color: #316ac5;
+}
+
+/* ── Online count in tray ─────────────────────── */
+#online-count {
+    font-size: 9px;
+    color: rgba(255,255,255,0.7);
+    min-width: 8px;
+}
+
+/* ── WMP shuffle/repeat active ────────────────── */
+.wmp-skip { transition: opacity 0.15s, box-shadow 0.15s; }
+
+/* ── System tray icon polish ──────────────────── */
+.tray-icon { display:flex;align-items:center;justify-content:center; }
+.tray-vol svg, .tray-net svg { display:block; }
+.tray-vol:hover svg path, .tray-vol:hover svg line,
+.tray-vol:hover svg circle, .tray-vol:hover svg ellipse { opacity:1 !important; }
+.tray-online:hover { opacity:0.85; }
+
+/* ── Volume popup ─────────────────────────────── */
+#vol-popup { user-select:none; }
+
+/* ── Titlebar pinstripe texture (XP Luna accurate) ── */
+.xp-titlebar {
+    background-image:
+        repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0) 0px,
+            rgba(255,255,255,0) 3px,
+            rgba(255,255,255,0.03) 3px,
+            rgba(255,255,255,0.03) 4px
+        ),
+        linear-gradient(180deg,
+            #0f78d4 0%, #1585e0 6%, #1c8fe8 12%,
+            #1a8ae4 25%, #1680dc 55%, #1070cc 80%,
+            #0c64be 90%, #0a5ab6 100%
+        );
+}
+.xp-window.unfocused .xp-titlebar {
+    background-image:
+        repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0) 0px,
+            rgba(255,255,255,0) 3px,
+            rgba(255,255,255,0.02) 3px,
+            rgba(255,255,255,0.02) 4px
+        ),
+        linear-gradient(180deg,
+            #7a96c2 0%, #8aa8d0 10%,
+            #90aed4 20%, #8caad0 50%,
+            #84a0c8 80%, #7c98c0 100%
+        );
+}
+
+/* ── Desktop icon label polish ───────────────────── */
+.desktop-icon span {
+    display:inline-block;
+    padding:1px 3px;
+    border-radius:2px;
+    text-align:center;
+    text-shadow:1px 1px 3px #000, 0 0 6px rgba(0,0,0,0.9);
+}
+.desktop-icon:hover span,
+.desktop-icon.selected span {
+    background: #316ac5;
+    color: white;
+    text-shadow: none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
+}
+
+/* ── Start button text kerning ───────────────────── */
+#start-btn {
+    letter-spacing: 0.5px;
+    padding: 0 10px 0 4px;
+}
+.start-orb {
+    margin-right: 1px;
+}
+
+/* ── MSN typing indicator ─────────────────────────── */
+.msn-typing {
+    font-size:10px;
+    color:#888;
+    padding:1px 10px;
+    min-height:14px;
+    font-style:italic;
+}
+
+/* ── BSOD ─────────────────────────────────────────── */
+#bsod {
+    cursor: none;
+}
+#bsod * { cursor: none; }
+
+/* ── Error dialog ─────────────────────────────────── */
+#err-dialog, #err-overlay {
+    font-family: Tahoma, Verdana, sans-serif;
+}
+
+/* ── Explorer address input editable state ────────── */
+.explorer-address-input {
+    cursor: text;
+}
+.explorer-address-input:focus {
+    background: #fff;
+    border-color: #316ac5;
+    box-shadow: 0 0 0 1px rgba(49,106,197,0.3);
+}
