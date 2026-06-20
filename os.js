@@ -15,7 +15,7 @@ let dragState    = null;
 let clockInterval = null;
 
 // ── Maintenance mode ────────────────────────────────────────────────────────
-const MAINTENANCE_MODE = false;
+const MAINTENANCE_MODE = true;
 const LOCK_PASSWORD    = 'knoxialover';
 
 // ── VFS ─────────────────────────────────────────────────────────────────────
