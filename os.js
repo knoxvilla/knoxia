@@ -14,9 +14,22 @@ let focusedId    = null;
 let dragState    = null;
 let clockInterval = null;
 
+// ── Supabase config ──────────────────────────────────────────────────────────
+const _SUPA_URL = 'https://tmgyzqmelczjqlebmgpv.supabase.co';
+const _SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZ3l6cW1lbGN6anFsZWJtZ3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjYyMTYsImV4cCI6MjA5NzIwMjIxNn0.YqR0tyNbQA8uLFuikwmk0GfxBHUXkNrdS4x5YCCziXU';
+
 // ── Maintenance mode ────────────────────────────────────────────────────────
 const MAINTENANCE_MODE = true;
-const LOCK_PASSWORD    = 'knoxialover';
+// Password stored as hash - not plain text
+const _LOCK_HASH = 592262967; // djb2 hash of actual password
+function _checkPassword(input) {
+    let h = 5381;
+    for (let i = 0; i < input.length; i++) {
+        h = ((h << 5) + h) + input.charCodeAt(i);
+        h = h & 0xFFFFFFFF;
+    }
+    return h === _LOCK_HASH;
+}
 
 // ── VFS ─────────────────────────────────────────────────────────────────────
 const VFS = {
@@ -49,6 +62,10 @@ const DESKTOP_ICONS = [
     { id: 'music_player', label: 'Media Player',   x: 16, y: 196, iconType: 'wmp'      },
     { id: 'msn_chat',     label: 'Messenger',      x: 16, y: 286, iconType: 'msn'      },
     { id: 'recycle_bin',  label: 'Recycle Bin',    x: 16, y: 376, iconType: 'bin'      },
+    { id: 'knox_radio',   label: 'Knox Radio',     x: 16, y: 466, iconType: 'wmp'      },
+    { id: 'minesweeper',  label: 'Minesweeper',    x: 96, y: 16,  iconType: 'info'     },
+    { id: 'solitaire',    label: 'Solitaire',      x: 96, y: 106, iconType: 'folder'   },
+    { id: 'paint',        label: 'Paint',          x: 96, y: 196, iconType: 'notepad'  },
 ];
 
 // ── Audio ────────────────────────────────────────────────────────────────────
@@ -60,7 +77,8 @@ function ensureAudioCtx() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
+        analyser.fftSize = 256; // more bins = better spectrum detail
+        analyser.smoothingTimeConstant = 0.75;
         analyser.connect(audioCtx.destination);
         eqData = new Uint8Array(analyser.frequencyBinCount);
     }
@@ -408,6 +426,10 @@ function buildStartMenu() {
         { id: 'explorer',     label: 'My Computer',         iconType: 'computer' },
         { id: 'my_music',     label: 'My Music',            iconType: 'folder'   },
         { id: 'notepad',      label: 'Notepad',             iconType: 'notepad'  },
+        { id: 'knox_radio',   label: 'Knox Radio',          iconType: 'wmp'      },
+        { id: 'minesweeper',   label: 'Minesweeper',         iconType: 'info'     },
+        { id: 'solitaire',     label: 'Solitaire',           iconType: 'folder'   },
+        { id: 'paint',         label: 'Paint',               iconType: 'notepad'  },
     ].forEach(item => {
         const div = el('div', 'start-menu-item');
         const ico = el('div', 'menu-icon'); ico.appendChild(makeXPIcon(item.iconType, 32));
@@ -468,6 +490,10 @@ function launchApp(id, opts) {
     if (id === 'music_player') return openMusicPlayer();
     if (id === 'msn_chat')     return openMSNChat();
     if (id === 'sys_info')     return openSysInfo();
+    if (id === 'knox_radio')   return openKnoxRadio();
+    if (id === 'minesweeper')  return openMinesweeper();
+    if (id === 'solitaire')    return openSolitaire();
+    if (id === 'paint')        return openPaint();
     if (id === 'recycle_bin')  return openExplorer('Recycle Bin');
 }
 
@@ -692,13 +718,20 @@ function openMusicPlayer() {
     // Stage
     const stage = el('div', 'wmp-stage');
     const info  = el('div', 'wmp-info');
+    // Album art + track info row
+    const infoRow = el('div'); infoRow.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px 2px;background:#000;';
+    const albumArt = el('img'); albumArt.src = './music/covermain.png';
+    albumArt.style.cssText = 'width:48px;height:48px;object-fit:cover;border-radius:2px;border:1px solid rgba(255,255,255,0.15);flex-shrink:0;';
+    albumArt.onerror = () => albumArt.style.display = 'none';
+    const infoText = el('div'); infoText.style.cssText = 'flex:1;overflow:hidden;';
     const artistEl = el('div', 'wmp-artist'); artistEl.textContent = 'Ramsey Knox';
-    // Marquee wrapper — hidden overflow, inner span scrolls
     const trackEl      = el('div', 'wmp-track-name');
     const trackInner   = el('span', 'wmp-track-inner');
     trackInner.textContent = playlist[currentTrack]?.label ?? 'No Track';
     trackEl.appendChild(trackInner);
-    info.append(artistEl, trackEl);
+    infoText.append(artistEl, trackEl);
+    infoRow.append(albumArt, infoText);
+    info.appendChild(infoRow);
 
     // Visualizer canvas
     const vizWrap = el('div', 'wmp-viz-wrap');
@@ -798,16 +831,18 @@ function openMusicPlayer() {
     });
 
     // Visualizer
-    let vizRAF;
     const vizCtx = vizCanvas.getContext('2d');
-    let vizT = 0;
-    const blobs = [
-        { x:0.5, y:0.5, r:0.35, color:[180,20,80],  speed:0.008, ox:0.3, oy:0.25 },
-        { x:0.3, y:0.6, r:0.30, color:[20,80,200],  speed:0.012, ox:0.4, oy:0.3  },
-        { x:0.7, y:0.4, r:0.28, color:[200,120,10], speed:0.007, ox:0.35,oy:0.2  },
-        { x:0.5, y:0.3, r:0.25, color:[140,10,160], speed:0.010, ox:0.25,oy:0.35 },
-        { x:0.4, y:0.7, r:0.22, color:[10,160,100], speed:0.009, ox:0.3, oy:0.28 },
-    ];
+    let vizRAF;
+    // Need a larger FFT for per-bar resolution
+    const VIZ_BARS = 28;
+    const barHeights  = new Float32Array(VIZ_BARS).fill(0); // smoothed heights
+    const peakHeights = new Float32Array(VIZ_BARS).fill(0); // peak dots
+    const peakTimers  = new Float32Array(VIZ_BARS).fill(0); // peak hold timer
+    let   vizT = 0;
+
+    // Block characters from bottom to top — 8 levels per cell
+    const BLOCKS = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    const ROWS    = 10; // number of text rows in the display
 
     function drawViz() {
         vizRAF = requestAnimationFrame(drawViz);
@@ -815,63 +850,134 @@ function openMusicPlayer() {
         if (W === 0 || H === 0) return;
         if (vizCanvas.width !== W)  vizCanvas.width  = W;
         if (vizCanvas.height !== H) vizCanvas.height = H;
+        vizT += 0.016;
 
-        vizT += 0.018;
-        // Sample audio if playing
-        let bassEnergy = 0, midEnergy = 0;
+        const ctx = vizCtx;
+
+        // ── Sample frequencies ──────────────────────────────────────────────
+        const rawBars = new Float32Array(VIZ_BARS);
         if (analyser && audio && !audio.paused) {
-            analyser.getByteFrequencyData(eqData);
-            const len = eqData.length;
-            for (let i = 0; i < Math.floor(len*0.15); i++) bassEnergy += eqData[i];
-            for (let i = Math.floor(len*0.15); i < Math.floor(len*0.5); i++) midEnergy += eqData[i];
-            bassEnergy = bassEnergy / (Math.floor(len*0.15)*255);
-            midEnergy  = midEnergy  / (Math.floor(len*0.35)*255);
+            // Use a larger buffer for better resolution
+            const freqData = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(freqData);
+            const len    = freqData.length;
+            // Map frequency bins to bars — logarithmic scale for better bass/treble balance
+            for (let b = 0; b < VIZ_BARS; b++) {
+                const lo = Math.floor(Math.pow(b / VIZ_BARS, 1.8) * len);
+                const hi = Math.max(lo + 1, Math.floor(Math.pow((b + 1) / VIZ_BARS, 1.8) * len));
+                let sum  = 0;
+                for (let i = lo; i < hi; i++) sum += freqData[i];
+                rawBars[b] = sum / ((hi - lo) * 255);
+            }
         } else {
-            bassEnergy = 0.15 + Math.sin(vizT*1.2)*0.1;
-            midEnergy  = 0.10 + Math.sin(vizT*0.9+1)*0.08;
+            // Idle animation — gentle sine waves
+            for (let b = 0; b < VIZ_BARS; b++) {
+                rawBars[b] = 0.05 + 0.06 * Math.sin(vizT * 1.5 + b * 0.4) + 0.03 * Math.sin(vizT * 2.3 + b * 0.7);
+            }
         }
-        vizCtx.fillStyle = 'rgba(0,0,0,0.18)';
-        vizCtx.fillRect(0, 0, W, H);
-        blobs.forEach((b, i) => {
-            const energy = i < 2 ? bassEnergy : midEnergy;
-            const boost = 1 + energy * 2.5;
-            const px = (b.x + Math.sin(vizT*b.speed*80+i*1.3)*b.ox*boost)*W;
-            const py = (b.y + Math.cos(vizT*b.speed*60+i*0.9)*b.oy*boost)*H;
-            const r  = (b.r + Math.sin(vizT*b.speed*50+i)*0.12 + energy*0.2)*Math.min(W,H);
-            if (r <= 0) return;
-            const grad = vizCtx.createRadialGradient(px,py,0,px,py,r);
-            const [R,G,B] = b.color;
-            const alpha = Math.min(0.9, 0.45 + energy*0.8 + Math.sin(vizT*b.speed*40+i*2)*0.15);
-            grad.addColorStop(0,   `rgba(${R},${G},${B},${alpha})`);
-            grad.addColorStop(0.4, `rgba(${Math.round(R*0.6)},${Math.round(G*0.6)},${Math.round(B*0.6)},${alpha*0.5})`);
-            grad.addColorStop(1,   'rgba(0,0,0,0)');
-            vizCtx.globalCompositeOperation = 'screen';
-            vizCtx.fillStyle = grad;
-            vizCtx.fillRect(0, 0, W, H);
-        });
-        const cx = W*(0.5+Math.sin(vizT*0.3)*0.05);
-        const cy = H*(0.5+Math.cos(vizT*0.25)*0.08);
-        for (let i = 0; i < 10; i++) {
-            const angle = (i/10)*Math.PI*2+vizT*0.4;
-            const len   = Math.min(W,H)*(0.25+midEnergy*0.35)*(0.6+Math.sin(vizT*0.8+i)*0.4);
-            const hue   = (vizT*30+i*36)%360;
-            const grd   = vizCtx.createLinearGradient(cx,cy,cx+Math.cos(angle)*len,cy+Math.sin(angle)*len);
-            grd.addColorStop(0, `hsla(${hue},100%,70%,${0.08+midEnergy*0.2})`);
-            grd.addColorStop(1, 'hsla(0,0%,0%,0)');
-            vizCtx.beginPath(); vizCtx.moveTo(cx,cy);
-            vizCtx.lineTo(cx+Math.cos(angle)*len, cy+Math.sin(angle)*len);
-            vizCtx.strokeStyle = grd; vizCtx.lineWidth = 1+bassEnergy*2; vizCtx.stroke();
+
+        // Smooth bars (attack fast, decay slow)
+        for (let b = 0; b < VIZ_BARS; b++) {
+            if (rawBars[b] > barHeights[b]) {
+                barHeights[b] = barHeights[b] * 0.4 + rawBars[b] * 0.6; // fast attack
+            } else {
+                barHeights[b] *= 0.88; // slow decay
+            }
+            // Peak hold
+            if (rawBars[b] >= peakHeights[b]) {
+                peakHeights[b] = rawBars[b];
+                peakTimers[b]  = 0;
+            } else {
+                peakTimers[b]++;
+                if (peakTimers[b] > 24) peakHeights[b] = Math.max(0, peakHeights[b] - 0.012);
+            }
         }
-        if (bassEnergy > 0.15) {
-            const ring = vizCtx.createRadialGradient(cx,cy,0,cx,cy,Math.min(W,H)*0.4*bassEnergy*3);
-            ring.addColorStop(0,   'rgba(255,255,255,0)');
-            ring.addColorStop(0.7, `rgba(255,255,255,${bassEnergy*0.15})`);
-            ring.addColorStop(1,   'rgba(255,255,255,0)');
-            vizCtx.globalCompositeOperation = 'screen';
-            vizCtx.fillStyle = ring;
-            vizCtx.fillRect(0,0,W,H);
+
+        // ── Draw ────────────────────────────────────────────────────────────
+        // Black background
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, W, H);
+
+        const fontSize  = Math.max(8, Math.floor(H / ROWS));
+        const font      = `${fontSize}px "Courier New", monospace`;
+        ctx.font        = font;
+        ctx.textBaseline = 'top';
+
+        const charW = W / VIZ_BARS;
+        const totalH = ROWS * fontSize;
+        const offsetY = Math.max(0, (H - totalH) / 2);
+
+        for (let b = 0; b < VIZ_BARS; b++) {
+            const h       = Math.min(barHeights[b], 1);
+            const fullRows = h * ROWS;             // how many full rows filled
+            const fullInt  = Math.floor(fullRows);
+            const frac     = fullRows - fullInt;   // fractional row (for sub-block char)
+
+            const x = b * charW;
+
+            // Draw each row from bottom up
+            for (let row = 0; row < ROWS; row++) {
+                const rowFromBottom = ROWS - 1 - row; // 0 = bottom row
+                const y = offsetY + row * fontSize;
+
+                let ch = ' ';
+                let brightness = 0;
+
+                if (rowFromBottom < fullInt) {
+                    // Full block
+                    ch = '█';
+                    brightness = 1;
+                } else if (rowFromBottom === fullInt && frac > 0) {
+                    // Partial block using sub-block characters
+                    ch = BLOCKS[Math.round(frac * 8)];
+                    brightness = frac;
+                }
+
+                if (ch === ' ') continue;
+
+                // Color: bright green/cyan at top, darker green at bottom
+                // Plus extra brightness boost on bass-heavy bars (first 6)
+                const isBass = b < 6;
+                const topness = rowFromBottom / ROWS; // 0=bottom, 1=top
+
+                let r, g, bl;
+                if (isBass && h > 0.5) {
+                    // Bass bars go yellow/white at peak
+                    r = Math.round(80  + topness * 175);
+                    g = Math.round(200 + topness * 55);
+                    bl = Math.round(20  + topness * 20);
+                } else {
+                    // Standard: dark green → bright cyan
+                    r  = Math.round(0   + topness * 80);
+                    g  = Math.round(140 + topness * 115);
+                    bl = Math.round(40  + topness * 215);
+                }
+
+                const alpha = 0.5 + brightness * 0.5;
+                ctx.fillStyle = `rgba(${r},${g},${bl},${alpha})`;
+                ctx.fillText(ch, x, y);
+            }
+
+            // Peak dot — bright white/cyan dot at peak position
+            if (peakHeights[b] > 0.02) {
+                const peakRow  = ROWS - 1 - Math.floor(peakHeights[b] * ROWS);
+                const clampRow = Math.max(0, Math.min(ROWS - 1, peakRow));
+                const py = offsetY + clampRow * fontSize;
+                ctx.fillStyle = 'rgba(180,255,255,0.9)';
+                ctx.fillText('─', x, py);
+            }
         }
-        vizCtx.globalCompositeOperation = 'source-over';
+
+        // Subtle scanline overlay
+        for (let y = 0; y < H; y += 3) {
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(0, y, W, 1);
+        }
+
+        // Bottom label — subtle terminal style
+        ctx.font      = `${Math.max(7, fontSize - 2)}px "Courier New", monospace`;
+        ctx.fillStyle = 'rgba(0,200,100,0.25)';
+        ctx.fillText(`SPECTRUM  ${VIZ_BARS} BANDS`, 4, H - fontSize + 2);
     }
     drawViz();
 
@@ -935,10 +1041,15 @@ function openMusicPlayer() {
 
 // ── MSN Chat ──────────────────────────────────────────────────────────────────
 function openMSNChat() {
-    const SUPA_URL = 'https://tmgyzqmelczjqlebmgpv.supabase.co';
-    const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZ3l6cW1lbGN6anFsZWJtZ3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjYyMTYsImV4cCI6MjA5NzIwMjIxNn0.YqR0tyNbQA8uLFuikwmk0GfxBHUXkNrdS4x5YCCziXU';
+    const SUPA_URL = _SUPA_URL;
+    const SUPA_KEY = _SUPA_KEY;
     const headers  = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
-    const visitorName = 'Visitor_' + Math.random().toString(36).slice(2,6).toUpperCase();
+    // Persistent visitor name — same across refreshes
+    let visitorName = localStorage.getItem('knoxiaos_visitor_name');
+    if (!visitorName) {
+        visitorName = 'Visitor_' + Math.random().toString(36).slice(2,6).toUpperCase();
+        localStorage.setItem('knoxiaos_visitor_name', visitorName);
+    }
     let seenIds = new Set();
     let realtimeSocket = null;
 
@@ -1002,13 +1113,16 @@ function openMSNChat() {
     function addMsg(text, from, isSystem, ts) {
         const row = el('div', 'msn-msg-row');
         if (isSystem) {
-            row.style.cssText = 'align-items:center;';
-            const sys = el('div'); sys.style.cssText = 'font-size:10px;color:#888;padding:2px 0;text-align:center;';
+            row.style.cssText = 'align-items:center;margin:2px 0;';
+            const sys = el('div');
+            sys.style.cssText = 'font-size:10px;color:#888;padding:2px 8px;text-align:center;background:rgba(0,0,0,0.04);border-radius:2px;font-style:italic;';
             sys.textContent = text; row.appendChild(sys);
         } else {
             const isSelf = from === visitorName;
-            const who = el('div', 'msn-msg-who ' + (isSelf ? 'me' : 'them'));
-            who.textContent = from + ' says:';
+            const isKnox = from === 'Knox' || from === 'RamseyKnox' || from === 'knox';
+            const whoClass = isSelf ? 'me' : isKnox ? 'knox' : 'them';
+            const who = el('div', 'msn-msg-who ' + whoClass);
+            who.textContent = (isKnox ? '🎵 ' : '') + from + ' says:';
             const txt = el('div', 'msn-msg-txt'); txt.textContent = text;
             const tsEl = el('div', 'msn-msg-ts'); tsEl.textContent = ts ? fmtTs(ts) : '';
             row.append(who, txt, tsEl);
@@ -1041,6 +1155,7 @@ function openMSNChat() {
     const inputRow = el('div', 'msn-input-row');
     const inputBox = el('textarea', 'msn-input-box');
     inputBox.placeholder = '';
+    inputBox.maxLength = 500;
     const inputBtns = el('div', 'msn-input-btns');
     const sendBtn   = el('button', 'msn-send-btn');   sendBtn.textContent   = 'Send';
     const searchBtn = el('button', 'msn-search-btn'); searchBtn.textContent = 'Find';
@@ -1092,9 +1207,31 @@ function openMSNChat() {
         sendBtn.disabled = false;
     }
 
+    // Spam protection state
+    let _msgTimestamps = [];
+    const MAX_MSG_LEN = 500;
+    const RATE_LIMIT   = 5;   // max messages
+    const RATE_WINDOW  = 60000; // per 60 seconds
+
     const send = () => {
         const txt = inputBox.value.trim();
         if (!txt || sendBtn.disabled) return;
+
+        // Length check
+        if (txt.length > MAX_MSG_LEN) {
+            addMsg(`Message too long (max ${MAX_MSG_LEN} characters)`, '', true);
+            return;
+        }
+
+        // Rate limit check
+        const now = Date.now();
+        _msgTimestamps = _msgTimestamps.filter(t => now - t < RATE_WINDOW);
+        if (_msgTimestamps.length >= RATE_LIMIT) {
+            addMsg('You\'re sending too fast. Please wait a moment.', '', true);
+            return;
+        }
+        _msgTimestamps.push(now);
+
         inputBox.value = '';
         addMsg(txt, visitorName, false, new Date().toISOString());
         sendMessage(txt);
@@ -1259,6 +1396,212 @@ function showNowPlayingToast(title, subtitle, iconType) {
         t.style.animation = 'toast-out 0.3s ease forwards';
         setTimeout(() => t.remove(), 300);
     }, 4000);
+}
+
+
+// ── Knox Radio ────────────────────────────────────────────────────────────────
+// Spotify "Now Playing" — polls every 30s, shows what Knox is listening to
+const _SP_CLIENT_ID     = '1b4cac7fe79e4d778ac8b72e64e8a187';
+const _SP_CLIENT_SECRET = '40e72de1b50747dba1969ba4d689e1a7';
+const _SP_REFRESH_TOKEN = 'AQBLKZs_TcJLtg9QeDQkZeICA6fAMn-udlL6LtaSO84T9MlzcXUF_rmBWGlv_mRvVapk006ZHSHRH1GDEpCH5pKoPZ1NkPcGlDNo9Yu2X9o_LMkIsEXrwFD2KbmR7BTBzGA';
+let _spAccessToken = null, _spTokenExpiry = 0;
+
+async function _spGetToken() {
+    if (_spAccessToken && Date.now() < _spTokenExpiry) return _spAccessToken;
+    try {
+        const res = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + btoa(_SP_CLIENT_ID + ':' + _SP_CLIENT_SECRET),
+            },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: _SP_REFRESH_TOKEN }),
+        });
+        const data = await res.json();
+        _spAccessToken = data.access_token;
+        _spTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+        return _spAccessToken;
+    } catch(e) { return null; }
+}
+
+async function _spNowPlaying() {
+    const token = await _spGetToken();
+    if (!token) return null;
+    try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+            headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (res.status === 204 || res.status === 404) return null;
+        const data = await res.json();
+        if (!data || !data.item) return null;
+        return {
+            name:     data.item.name,
+            artist:   data.item.artists.map(a => a.name).join(', '),
+            album:    data.item.album.name,
+            art:      data.item.album.images[1]?.url || data.item.album.images[0]?.url,
+            progress: data.progress_ms,
+            duration: data.item.duration_ms,
+            playing:  data.is_playing,
+            url:      data.item.external_urls.spotify,
+        };
+    } catch(e) { return null; }
+}
+
+function openKnoxRadio() {
+    const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;background:#0a0a0a;';
+
+    // Header
+    const header = el('div');
+    header.style.cssText = `
+        padding:12px 14px 10px;
+        background:linear-gradient(180deg,#1a1a2a,#0e0e1a);
+        border-bottom:1px solid rgba(255,255,255,0.08);
+        display:flex;align-items:center;gap:10px;
+    `;
+    const radioIco = el('div'); radioIco.style.cssText = 'font-size:20px;';
+    radioIco.textContent = '📻';
+    const radioTitle = el('div');
+    radioTitle.style.cssText = 'color:white;font-size:13px;font-weight:bold;';
+    radioTitle.textContent = 'Knox Radio';
+    const radioSub = el('div');
+    radioSub.style.cssText = 'color:rgba(255,255,255,0.4);font-size:10px;margin-left:auto;font-style:italic;';
+    radioSub.textContent = 'live from Stockholm';
+    header.append(radioIco, radioTitle, radioSub);
+
+    // Now playing area
+    const nowPlaying = el('div');
+    nowPlaying.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px;';
+
+    // Album art
+    const artWrap = el('div');
+    artWrap.style.cssText = 'position:relative;width:160px;height:160px;';
+    const artImg = el('img');
+    artImg.style.cssText = 'width:160px;height:160px;object-fit:cover;border-radius:4px;border:2px solid rgba(255,255,255,0.1);box-shadow:0 8px 24px rgba(0,0,0,0.6);display:block;';
+    artImg.src = './music/covermain.png';
+    // Vinyl spin effect when playing
+    const vinylRing = el('div');
+    vinylRing.style.cssText = 'position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(29,185,84,0.4);opacity:0;transition:opacity 0.5s;pointer-events:none;';
+    artWrap.append(artImg, vinylRing);
+
+    // Track info
+    const trackName = el('div');
+    trackName.style.cssText = 'color:white;font-size:14px;font-weight:bold;text-align:center;max-width:220px;line-height:1.3;';
+    trackName.textContent = 'Nothing playing';
+    const artistName = el('div');
+    artistName.style.cssText = 'color:rgba(255,255,255,0.6);font-size:11px;text-align:center;';
+    artistName.textContent = '—';
+    const albumName = el('div');
+    albumName.style.cssText = 'color:rgba(255,255,255,0.35);font-size:10px;text-align:center;font-style:italic;';
+    albumName.textContent = '';
+
+    // Progress bar
+    const progWrap = el('div');
+    progWrap.style.cssText = 'width:200px;display:flex;flex-direction:column;gap:4px;';
+    const progTrack = el('div');
+    progTrack.style.cssText = 'height:3px;background:rgba(255,255,255,0.15);border-radius:2px;position:relative;';
+    const progFill = el('div');
+    progFill.style.cssText = 'height:100%;width:0%;background:#1db954;border-radius:2px;transition:width 1s linear;';
+    progTrack.appendChild(progFill);
+    const progLabels = el('div');
+    progLabels.style.cssText = 'display:flex;justify-content:space-between;';
+    const progCur = el('span'); progCur.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.4);font-family:"Courier New",monospace;';
+    const progDur = el('span'); progDur.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.4);font-family:"Courier New",monospace;';
+    progLabels.append(progCur, progDur);
+    progWrap.append(progTrack, progLabels);
+
+    // Status + Spotify link
+    const statusRow = el('div');
+    statusRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    const statusDot = el('div');
+    statusDot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#555;transition:background 0.3s;flex-shrink:0;';
+    const statusTxt = el('div');
+    statusTxt.style.cssText = 'color:rgba(255,255,255,0.4);font-size:10px;';
+    statusTxt.textContent = 'Checking...';
+    const spotifyBtn = el('div');
+    spotifyBtn.style.cssText = 'margin-left:auto;background:#1db954;color:white;font-size:9px;padding:3px 8px;border-radius:2px;cursor:pointer;font-weight:bold;display:none;';
+    spotifyBtn.textContent = '▶ Open in Spotify';
+    statusRow.append(statusDot, statusTxt, spotifyBtn);
+
+    nowPlaying.append(artWrap, trackName, artistName, albumName, progWrap, statusRow);
+
+    // Footer
+    const footer = el('div');
+    footer.style.cssText = 'padding:8px 14px;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:6px;';
+    const footerTxt = el('div');
+    footerTxt.style.cssText = 'font-size:9px;color:rgba(255,255,255,0.25);font-style:italic;flex:1;';
+    footerTxt.textContent = 'Updates every 30 seconds • Powered by Spotify';
+    const refreshBtn = el('div');
+    refreshBtn.style.cssText = 'font-size:10px;color:rgba(255,255,255,0.4);cursor:pointer;padding:2px 6px;border:1px solid rgba(255,255,255,0.1);border-radius:2px;';
+    refreshBtn.textContent = '↻ Refresh';
+    footer.append(footerTxt, refreshBtn);
+
+    wrap.append(header, nowPlaying, footer);
+
+    function fmtMs(ms) {
+        if (!ms) return '0:00';
+        const s = Math.floor(ms/1000);
+        return Math.floor(s/60) + ':' + (s%60).toString().padStart(2,'0');
+    }
+
+    let pollInterval = null;
+    let currentUrl   = null;
+
+    async function poll() {
+        const data = await _spNowPlaying();
+        if (!data) {
+            statusDot.style.background = '#555';
+            statusTxt.textContent = 'Knox is offline';
+            vinylRing.style.opacity = '0';
+            trackName.textContent  = 'Nothing playing right now';
+            artistName.textContent = '—';
+            albumName.textContent  = '';
+            progFill.style.width   = '0%';
+            progCur.textContent    = '';
+            progDur.textContent    = '';
+            spotifyBtn.style.display = 'none';
+            return;
+        }
+
+        // Update art
+        if (data.art && artImg.src !== data.art) artImg.src = data.art;
+
+        trackName.textContent  = data.name;
+        artistName.textContent = data.artist;
+        albumName.textContent  = data.album;
+        progFill.style.width   = ((data.progress / data.duration) * 100).toFixed(1) + '%';
+        progCur.textContent    = fmtMs(data.progress);
+        progDur.textContent    = fmtMs(data.duration);
+
+        if (data.playing) {
+            statusDot.style.background = '#1db954';
+            statusTxt.textContent = '● Knox is listening now';
+            vinylRing.style.opacity = '1';
+        } else {
+            statusDot.style.background = '#f59e0b';
+            statusTxt.textContent = '⏸ Paused';
+            vinylRing.style.opacity = '0';
+        }
+
+        currentUrl = data.url;
+        spotifyBtn.style.display = 'block';
+    }
+
+    spotifyBtn.addEventListener('click', () => { if (currentUrl) window.open(currentUrl, '_blank'); });
+    refreshBtn.addEventListener('click', poll);
+
+    poll();
+    pollInterval = setInterval(poll, 30000);
+
+    const winObj = createWindow({
+        id: 'knox_radio', title: 'Knox Radio',
+        width: 280, height: 380, iconType: 'wmp', content: wrap,
+    });
+
+    winObj.el.querySelector('.xp-btn-close').addEventListener('click', () => {
+        clearInterval(pollInterval);
+    }, { once: true });
+
+    return winObj;
 }
 
 function openSysInfo() {
@@ -1525,8 +1868,8 @@ function showVolumePopup(anchor) {
 // ── Online Count ──────────────────────────────────────────────────────────────
 async function updateOnlineCount() {
     try {
-        const SUPA_URL = 'https://tmgyzqmelczjqlebmgpv.supabase.co';
-        const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtZ3l6cW1lbGN6anFsZWJtZ3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjYyMTYsImV4cCI6MjA5NzIwMjIxNn0.YqR0tyNbQA8uLFuikwmk0GfxBHUXkNrdS4x5YCCziXU';
+        const SUPA_URL = _SUPA_URL;
+        const SUPA_KEY = _SUPA_KEY;
         // Count messages in last 5 minutes as proxy for "online"
         const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
         const res   = await fetch(
@@ -1758,6 +2101,414 @@ for further assistance.
     function bsodKey(){ bsod.remove(); _eggFired=false; _eggProgress=0; triggerShutdown(); }
     document.addEventListener('keydown',bsodKey,{once:true});
     document.addEventListener('click',bsodKey,{once:true});
+}
+
+
+// ── Minesweeper ────────────────────────────────────────────────────────────────
+function openMinesweeper() {
+    const ROWS = 9, COLS = 9, MINES = 10;
+    let board = [], revealed = [], flagged = [], gameOver = false, gameWon = false, firstClick = true, timerInterval = null, seconds = 0, minesLeft = MINES;
+
+    function initBoard() {
+        board    = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+        revealed = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+        flagged  = Array.from({length:ROWS},()=>Array(COLS).fill(false));
+        gameOver = false; gameWon = false; firstClick = true; seconds = 0; minesLeft = MINES;
+    }
+
+    function placeMines(sr, sc) {
+        let placed = 0;
+        while (placed < MINES) {
+            const r = Math.floor(Math.random()*ROWS), c = Math.floor(Math.random()*COLS);
+            if (board[r][c] === -1 || (Math.abs(r-sr)<=1 && Math.abs(c-sc)<=1)) continue;
+            board[r][c] = -1; placed++;
+        }
+        for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+            if (board[r][c]===-1) continue;
+            let cnt=0;
+            for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){const nr=r+dr,nc=c+dc;if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1)cnt++;}
+            board[r][c]=cnt;
+        }
+    }
+
+    function reveal(r, c) {
+        if (r<0||r>=ROWS||c<0||c>=COLS||revealed[r][c]||flagged[r][c]) return;
+        revealed[r][c]=true;
+        if (board[r][c]===0) for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) reveal(r+dr,c+dc);
+    }
+
+    function checkWin() {
+        let unrev=0;
+        for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(!revealed[r][c]&&board[r][c]!==-1) unrev++;
+        return unrev===0;
+    }
+
+    const wrap = el('div'); wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;background:#c0c0c0;font-family:Tahoma,sans-serif;user-select:none;';
+
+    // Top bar
+    const topBar = el('div');
+    topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#c0c0c0;border-bottom:2px solid #808080;border-top:2px solid white;border-left:2px solid white;border-right:2px solid #808080;margin:6px;';
+
+    const mineCount = el('div');
+    mineCount.style.cssText = 'background:#000;color:#f00;font-family:"Courier New",monospace;font-size:18px;font-weight:bold;padding:2px 6px;min-width:40px;text-align:center;border:2px inset #808080;';
+    mineCount.textContent = '010';
+
+    const faceBtn = el('button');
+    faceBtn.style.cssText = 'width:28px;height:28px;font-size:16px;border:2px outset #c0c0c0;background:#c0c0c0;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+    faceBtn.textContent = '🙂';
+
+    const timerEl = el('div');
+    timerEl.style.cssText = 'background:#000;color:#f00;font-family:"Courier New",monospace;font-size:18px;font-weight:bold;padding:2px 6px;min-width:40px;text-align:center;border:2px inset #808080;';
+    timerEl.textContent = '000';
+
+    topBar.append(mineCount, faceBtn, timerEl);
+
+    // Grid
+    const grid = el('div');
+    grid.style.cssText = `display:grid;grid-template-columns:repeat(${COLS},22px);gap:0;border:3px inset #808080;margin:0 6px 6px;`;
+
+    function renderGrid() {
+        grid.innerHTML = '';
+        mineCount.textContent = String(minesLeft).padStart(3,'0');
+        for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+            const cell = el('div');
+            cell.style.cssText = 'width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;cursor:pointer;box-sizing:border-box;';
+            if (!revealed[r][c]) {
+                cell.style.cssText += 'background:#c0c0c0;border:2px outset #c0c0c0;';
+                cell.textContent = flagged[r][c] ? '🚩' : '';
+            } else if (board[r][c]===-1) {
+                cell.style.cssText += 'background:#f00;border:1px solid #808080;';
+                cell.textContent = '💣';
+            } else {
+                cell.style.cssText += 'background:#c0c0c0;border:1px solid #808080;';
+                const colors=['','#0000f0','#008000','#f00000','#000080','#800000','#008080','#000000','#808080'];
+                if (board[r][c]>0){cell.textContent=board[r][c];cell.style.color=colors[board[r][c]];}
+            }
+            const rr=r,cc=c;
+            cell.addEventListener('click',()=>{
+                if(gameOver||gameWon||flagged[rr][cc]) return;
+                if(firstClick){firstClick=false;placeMines(rr,cc);timerInterval=setInterval(()=>{seconds=Math.min(999,seconds+1);timerEl.textContent=String(seconds).padStart(3,'0');},1000);}
+                if(board[rr][cc]===-1){revealed[rr][cc]=true;gameOver=true;clearInterval(timerInterval);faceBtn.textContent='😵';for(let r2=0;r2<ROWS;r2++)for(let c2=0;c2<COLS;c2++)if(board[r2][c2]===-1)revealed[r2][c2]=true;}
+                else{reveal(rr,cc);if(checkWin()){gameWon=true;clearInterval(timerInterval);faceBtn.textContent='😎';showNowPlayingToast('Minesweeper','You win! 😎','info');}}
+                renderGrid();
+            });
+            cell.addEventListener('contextmenu',(e)=>{
+                e.preventDefault();e.stopPropagation();
+                if(gameOver||gameWon||revealed[rr][cc]) return;
+                flagged[rr][cc]=!flagged[rr][cc];minesLeft+=flagged[rr][cc]?-1:1;renderGrid();
+            });
+            grid.appendChild(cell);
+        }
+    }
+
+    faceBtn.addEventListener('click',()=>{clearInterval(timerInterval);initBoard();renderGrid();faceBtn.textContent='🙂';timerEl.textContent='000';});
+
+    wrap.append(topBar, grid);
+    initBoard(); renderGrid();
+
+    const winObj = createWindow({ id:'minesweeper', title:'Minesweeper', width:230, height:290, iconType:'info', content:wrap });
+    winObj.el.querySelector('.xp-btn-close').addEventListener('click',()=>clearInterval(timerInterval),{once:true});
+    return winObj;
+}
+
+
+// ── Solitaire ──────────────────────────────────────────────────────────────────
+function openSolitaire() {
+    const SUITS=['♠','♥','♦','♣'], VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+    const isRed = s => s==='♥'||s==='♦';
+
+    function makeDeck(){const d=[];for(const s of SUITS)for(const v of VALS)d.push({s,v,face:false});return d;}
+    function shuffle(d){for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]];}return d;}
+    function cardVal(v){return VALS.indexOf(v);}
+
+    let deck,tableau,foundations,stock,waste;
+    function deal(){
+        deck=shuffle(makeDeck());
+        tableau=Array.from({length:7},()=>[]);
+        foundations=Array.from({length:4},()=>[]);
+        stock=[];waste=[];
+        let i=0;
+        for(let col=0;col<7;col++){for(let row=0;row<=col;row++){const c=deck[i++];c.face=(row===col);tableau[col].push(c);}}
+        while(i<deck.length){deck[i].face=false;stock.push(deck[i++]);}
+    }
+
+    const wrap=el('div');wrap.style.cssText='display:flex;flex-direction:column;height:100%;background:#008000;padding:6px;gap:4px;user-select:none;font-family:Arial,sans-serif;overflow:hidden;';
+
+    let dragInfo=null;
+
+    function cardHTML(c,small){
+        if(!c) return '';
+        const col=isRed(c.s)?'#cc0000':'#000';
+        if(!c.face) return `<div style="width:${small?28:36}px;height:${small?40:52}px;background:linear-gradient(135deg,#1a3a8a,#2255cc);border-radius:3px;border:1px solid rgba(255,255,255,0.3);box-shadow:1px 1px 3px rgba(0,0,0,0.4);"></div>`;
+        return `<div style="width:${small?28:36}px;height:${small?40:52}px;background:white;border-radius:3px;border:1px solid #999;box-shadow:1px 1px 3px rgba(0,0,0,0.3);display:flex;flex-direction:column;justify-content:space-between;padding:2px;box-sizing:border-box;cursor:grab;">
+            <div style="font-size:${small?8:10}px;font-weight:bold;color:${col};line-height:1;">${c.v}<br>${c.s}</div>
+            <div style="font-size:${small?10:14}px;color:${col};text-align:center;line-height:1;">${c.s}</div>
+        </div>`;
+    }
+
+    function render(){
+        wrap.innerHTML='';
+        // Top row
+        const top=el('div');top.style.cssText='display:flex;gap:4px;align-items:flex-start;';
+        // Stock
+        const stockEl=el('div');stockEl.style.cssText='width:38px;height:54px;border-radius:3px;border:1px dashed rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;cursor:pointer;';
+        if(stock.length){stockEl.innerHTML=cardHTML({s:'♠',v:'A',face:false},false);}
+        else{stockEl.innerHTML='<div style="color:rgba(255,255,255,0.3);font-size:18px;">↺</div>';}
+        stockEl.addEventListener('click',()=>{
+            if(stock.length===0){while(waste.length){const c=waste.pop();c.face=false;stock.push(c);}render();return;}
+            const c=stock.pop();c.face=true;waste.push(c);render();
+        });
+        // Waste
+        const wasteEl=el('div');wasteEl.style.cssText='width:38px;height:54px;';
+        if(waste.length){
+            const c=waste[waste.length-1];
+            wasteEl.innerHTML=cardHTML(c,false);
+            wasteEl.addEventListener('click',()=>{
+                // Try auto-place to foundation
+                const card=waste[waste.length-1];
+                for(let fi=0;fi<4;fi++){
+                    const f=foundations[fi];
+                    if(card.v==='A'&&f.length===0){f.push(waste.pop());render();return;}
+                    if(f.length>0&&f[f.length-1].s===card.s&&cardVal(card.v)===cardVal(f[f.length-1].v)+1){f.push(waste.pop());render();return;}
+                }
+            });
+        }
+        // Spacer
+        const sp=el('div');sp.style.cssText='flex:1;';
+        // Foundations
+        const fRow=el('div');fRow.style.cssText='display:flex;gap:4px;';
+        foundations.forEach((f,fi)=>{
+            const fd=el('div');fd.style.cssText='width:38px;height:54px;border-radius:3px;border:1px dashed rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;';
+            fd.innerHTML=f.length?cardHTML(f[f.length-1],false):`<div style="color:rgba(255,255,255,0.2);font-size:16px;">${SUITS[fi]}</div>`;
+            fRow.appendChild(fd);
+        });
+        top.append(stockEl,wasteEl,sp,fRow);
+        // Tableau
+        const tab=el('div');tab.style.cssText='display:flex;gap:4px;flex:1;align-items:flex-start;';
+        tableau.forEach((col,ci)=>{
+            const colEl=el('div');colEl.style.cssText='width:38px;min-height:54px;position:relative;';
+            if(col.length===0){colEl.style.cssText+='border:1px dashed rgba(255,255,255,0.2);border-radius:3px;';}
+            col.forEach((c,ri)=>{
+                const cEl=el('div');cEl.style.cssText=`position:absolute;top:${ri*16}px;left:0;`;
+                cEl.innerHTML=cardHTML(c,false);
+                if(c.face&&ri===col.length-1){
+                    cEl.addEventListener('click',()=>{
+                        // Auto-place to foundation
+                        for(let fi=0;fi<4;fi++){
+                            const f=foundations[fi];
+                            if(c.v==='A'&&f.length===0){f.push(col.pop());if(col.length&&!col[col.length-1].face)col[col.length-1].face=true;render();return;}
+                            if(f.length>0&&f[f.length-1].s===c.s&&cardVal(c.v)===cardVal(f[f.length-1].v)+1){f.push(col.pop());if(col.length&&!col[col.length-1].face)col[col.length-1].face=true;render();return;}
+                        }
+                    });
+                } else if(!c.face&&ri===col.length-1){
+                    cEl.addEventListener('click',()=>{c.face=true;render();});
+                }
+                colEl.appendChild(cEl);
+            });
+            colEl.style.height=Math.max(54,col.length*16+38)+'px';
+            tab.appendChild(colEl);
+        });
+        wrap.append(top,tab);
+        // Check win
+        if(foundations.every(f=>f.length===13)){showNowPlayingToast('Solitaire','You win! 🃏','info');}
+    }
+
+    deal();render();
+    return createWindow({id:'solitaire',title:'Solitaire',width:310,height:420,iconType:'folder',content:wrap});
+}
+
+
+// ── MS Paint ───────────────────────────────────────────────────────────────────
+function openPaint() {
+    const wrap=el('div');wrap.style.cssText='display:flex;flex-direction:column;height:100%;background:#c0c0c0;';
+    const menubar=el('div','xp-menubar');
+    ['File','Edit','View','Image','Colors','Help'].forEach(lbl=>{const i=el('span','xp-menubar-item');i.textContent=lbl;menubar.appendChild(i);});
+
+    // Toolbar
+    const toolbar=el('div');toolbar.style.cssText='display:flex;gap:2px;padding:3px;background:#c0c0c0;border-bottom:1px solid #808080;flex-wrap:wrap;align-items:center;';
+    const tools=[
+        {id:'pencil',icon:'✏️',label:'Pencil'},
+        {id:'brush',icon:'🖌️',label:'Brush'},
+        {id:'eraser',icon:'⬜',label:'Eraser'},
+        {id:'fill',icon:'🪣',label:'Fill'},
+        {id:'line',icon:'╱',label:'Line'},
+        {id:'rect',icon:'▭',label:'Rectangle'},
+        {id:'ellipse',icon:'⬭',label:'Ellipse'},
+        {id:'text',icon:'A',label:'Text'},
+    ];
+    let currentTool='pencil', currentColor='#000000', bgColor='#ffffff', brushSize=2;
+    const toolBtns={};
+    tools.forEach(t=>{
+        const btn=el('button');
+        btn.style.cssText='width:28px;height:28px;background:#c0c0c0;border:2px outset #c0c0c0;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;';
+        btn.title=t.label;btn.textContent=t.icon;
+        btn.addEventListener('click',()=>{currentTool=t.id;Object.values(toolBtns).forEach(b=>b.style.border='2px outset #c0c0c0');btn.style.border='2px inset #808080';});
+        toolBtns[t.id]=btn;toolbar.appendChild(btn);
+    });
+    toolBtns['pencil'].style.border='2px inset #808080';
+
+    // Size picker
+    const sep=el('div');sep.style.cssText='width:1px;height:24px;background:#808080;margin:0 4px;';
+    toolbar.appendChild(sep);
+    [1,2,4,8].forEach(s=>{
+        const btn=el('button');btn.style.cssText='width:28px;height:28px;background:#c0c0c0;border:2px outset #c0c0c0;cursor:pointer;display:flex;align-items:center;justify-content:center;';
+        btn.innerHTML=`<div style="width:${Math.min(s*2,20)}px;height:${Math.min(s*2,20)}px;background:#000;border-radius:${s>2?'50%':'0'};"></div>`;
+        btn.title=`Size ${s}`;btn.addEventListener('click',()=>{brushSize=s;});
+        toolbar.appendChild(btn);
+    });
+
+    // Color picker
+    const sep2=el('div');sep2.style.cssText='width:1px;height:24px;background:#808080;margin:0 4px;';
+    toolbar.appendChild(sep2);
+    const colorInput=el('input');colorInput.type='color';colorInput.value='#000000';
+    colorInput.style.cssText='width:28px;height:28px;border:2px outset #c0c0c0;cursor:pointer;padding:0;';
+    colorInput.addEventListener('input',()=>currentColor=colorInput.value);
+    toolbar.appendChild(colorInput);
+
+    // Canvas area
+    const canvasWrap=el('div');canvasWrap.style.cssText='flex:1;overflow:auto;background:#808080;display:flex;align-items:flex-start;justify-content:flex-start;padding:4px;';
+    const canvas=document.createElement('canvas');
+    canvas.width=500;canvas.height=380;
+    canvas.style.cssText='cursor:crosshair;display:block;border:2px inset #808080;';
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);
+    canvasWrap.appendChild(canvas);
+
+    let drawing=false,lastX=0,lastY=0,startX=0,startY=0,snapshot=null;
+
+    function getPos(e){const r=canvas.getBoundingClientRect();return{x:Math.round(e.clientX-r.left),y:Math.round(e.clientY-r.top)};}
+
+    canvas.addEventListener('mousedown',e=>{
+        drawing=true;const p=getPos(e);lastX=p.x;lastY=p.y;startX=p.x;startY=p.y;
+        if(currentTool==='fill'){floodFill(p.x,p.y,currentColor);return;}
+        if(['line','rect','ellipse'].includes(currentTool)){snapshot=ctx.getImageData(0,0,canvas.width,canvas.height);}
+        ctx.beginPath();ctx.moveTo(p.x,p.y);
+    });
+    canvas.addEventListener('mousemove',e=>{
+        if(!drawing) return;
+        const p=getPos(e);
+        if(currentTool==='pencil'||currentTool==='brush'){
+            ctx.strokeStyle=currentColor;ctx.lineWidth=brushSize;ctx.lineCap='round';ctx.lineJoin='round';
+            ctx.lineTo(p.x,p.y);ctx.stroke();ctx.beginPath();ctx.moveTo(p.x,p.y);
+        } else if(currentTool==='eraser'){
+            ctx.fillStyle='#ffffff';ctx.fillRect(p.x-brushSize*2,p.y-brushSize*2,brushSize*4,brushSize*4);
+        } else if(currentTool==='line'&&snapshot){
+            ctx.putImageData(snapshot,0,0);
+            ctx.strokeStyle=currentColor;ctx.lineWidth=brushSize;
+            ctx.beginPath();ctx.moveTo(startX,startY);ctx.lineTo(p.x,p.y);ctx.stroke();
+        } else if(currentTool==='rect'&&snapshot){
+            ctx.putImageData(snapshot,0,0);
+            ctx.strokeStyle=currentColor;ctx.lineWidth=brushSize;
+            ctx.strokeRect(startX,startY,p.x-startX,p.y-startY);
+        } else if(currentTool==='ellipse'&&snapshot){
+            ctx.putImageData(snapshot,0,0);
+            ctx.strokeStyle=currentColor;ctx.lineWidth=brushSize;
+            ctx.beginPath();ctx.ellipse(startX+(p.x-startX)/2,startY+(p.y-startY)/2,Math.abs(p.x-startX)/2,Math.abs(p.y-startY)/2,0,0,Math.PI*2);ctx.stroke();
+        }
+        lastX=p.x;lastY=p.y;
+    });
+    canvas.addEventListener('mouseup',()=>{drawing=false;snapshot=null;});
+    canvas.addEventListener('mouseleave',()=>{if(drawing){drawing=false;snapshot=null;}});
+
+    function floodFill(x,y,fillColor){
+        const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+        const data=imageData.data;
+        const idx=(y*canvas.width+x)*4;
+        const tr=data[idx],tg=data[idx+1],tb=data[idx+2];
+        const fc=parseInt(fillColor.slice(1),16);
+        const fr=(fc>>16)&255,fg=(fc>>8)&255,fb=fc&255;
+        if(tr===fr&&tg===fg&&tb===fb) return;
+        const stack=[[x,y]];
+        while(stack.length){
+            const [cx,cy]=stack.pop();
+            if(cx<0||cx>=canvas.width||cy<0||cy>=canvas.height) continue;
+            const i=(cy*canvas.width+cx)*4;
+            if(data[i]!==tr||data[i+1]!==tg||data[i+2]!==tb) continue;
+            data[i]=fr;data[i+1]=fg;data[i+2]=fb;data[i+3]=255;
+            stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+        }
+        ctx.putImageData(imageData,0,0);
+    }
+
+    // Status bar
+    const statusbar=el('div','xp-statusbar');
+    const posPanel=el('div','xp-statusbar-panel');posPanel.style.minWidth='100px';
+    canvas.addEventListener('mousemove',e=>{const p=getPos(e);posPanel.textContent=p.x+', '+p.y;});
+    statusbar.appendChild(posPanel);
+
+    wrap.append(menubar,toolbar,canvasWrap,statusbar);
+    return createWindow({id:'paint',title:'Untitled - Paint',width:560,height:460,iconType:'folder',content:wrap});
+}
+
+
+// ── Screensaver ────────────────────────────────────────────────────────────────
+let _ssTimer=null, _ssActive=false;
+
+function _resetScreensaverTimer() {
+    clearTimeout(_ssTimer);
+    if(_ssActive) return;
+    _ssTimer=setTimeout(startScreensaver, 2*60*1000); // 2 minutes idle
+}
+
+function startScreensaver() {
+    if(_ssActive) return;
+    _ssActive=true;
+
+    const ss=el('div'); ss.id='screensaver';
+    ss.style.cssText='position:fixed;inset:0;z-index:15000;background:#000;cursor:none;overflow:hidden;';
+
+    // Bouncing DVD-style XP logo
+    const logo=el('div'); logo.style.cssText='position:absolute;width:120px;text-align:center;';
+
+    // XP flag
+    const flag=el('div'); flag.style.cssText='position:relative;width:56px;height:56px;margin:0 auto 4px;';
+    flag.innerHTML=`
+        <div style="position:absolute;top:0;left:0;width:26px;height:26px;background:linear-gradient(135deg,#f44,#c00);border-radius:2px;"></div>
+        <div style="position:absolute;top:0;right:0;width:26px;height:26px;background:linear-gradient(135deg,#4a4,#060);border-radius:2px;"></div>
+        <div style="position:absolute;bottom:0;left:0;width:26px;height:26px;background:linear-gradient(135deg,#44f,#008);border-radius:2px;"></div>
+        <div style="position:absolute;bottom:0;right:0;width:26px;height:26px;background:linear-gradient(135deg,#fa4,#a60);border-radius:2px;"></div>
+    `;
+    const logoText=el('div'); logoText.style.cssText='color:white;font-size:16px;font-family:Tahoma,sans-serif;';
+    logoText.innerHTML='<b>KnoxiaOS</b>';
+    logo.append(flag,logoText);
+    ss.appendChild(logo);
+
+    // Physics
+    const W=()=>window.innerWidth, H=()=>window.innerHeight;
+    let x=Math.random()*(W()-120), y=Math.random()*(H()-80);
+    let vx=1.5+(Math.random()*1), vy=1.2+(Math.random()*1);
+    const colors=['#f44','#4a4','#44f','#fa4','#1db954','#e91e8c','#00bcd4'];
+    let colorIdx=0;
+
+    function setColor(c){ flag.querySelectorAll('div').forEach(d=>d.style.filter=`hue-rotate(${Math.random()*360}deg)`); logoText.style.color=c; }
+    setColor(colors[0]);
+
+    let ssRAF;
+    function animate(){
+        x+=vx; y+=vy;
+        let bounced=false;
+        if(x<=0){x=0;vx=Math.abs(vx);bounced=true;}
+        if(x>=W()-120){x=W()-120;vx=-Math.abs(vx);bounced=true;}
+        if(y<=0){y=0;vy=Math.abs(vy);bounced=true;}
+        if(y>=H()-80){y=H()-80;vy=-Math.abs(vy);bounced=true;}
+        if(bounced){colorIdx=(colorIdx+1)%colors.length;setColor(colors[colorIdx]);}
+        logo.style.left=x+'px'; logo.style.top=y+'px';
+        ssRAF=requestAnimationFrame(animate);
+    }
+    animate();
+
+    // Click/key to dismiss
+    function dismiss(){
+        _ssActive=false;
+        cancelAnimationFrame(ssRAF);
+        ss.remove();
+        _resetScreensaverTimer();
+    }
+    ss.addEventListener('click',dismiss);
+    document.addEventListener('keydown',dismiss,{once:true});
+    document.addEventListener('mousemove',dismiss,{once:true});
+
+    document.getElementById('os-layer')?.appendChild(ss);
 }
 
 function triggerShutdown() {
@@ -2201,7 +2952,7 @@ function showLockScreen(onUnlock) {
     });
 
     function attempt() {
-        if (pwInput.value === LOCK_PASSWORD) {
+        if (_checkPassword(pwInput.value)) {
             lock.style.transition = 'opacity 0.5s ease';
             lock.style.opacity    = '0';
             setTimeout(() => { lock.remove(); onUnlock(); }, 500);
@@ -2357,6 +3108,11 @@ function bootDesktop() {
     attachGlobalEvents();
     if (!audio && playlist.length > 0) loadTrack(0);
     setTimeout(showWelcomePopup, 2200);
+    // Screensaver — starts after 2 min idle
+    _resetScreensaverTimer();
+    ['mousemove','keydown','click','contextmenu'].forEach(ev =>
+        document.addEventListener(ev, _resetScreensaverTimer)
+    );
 }
 
 window.KnoxiaOS = { init: initOS };

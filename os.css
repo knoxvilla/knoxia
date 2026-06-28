@@ -1710,3 +1710,28 @@
     border-color: #316ac5;
     box-shadow: 0 0 0 1px rgba(49,106,197,0.3);
 }
+
+/* ── MSN Knox host identity ───────────────────── */
+.msn-msg-who.knox {
+    color: #006600;
+    font-weight: bold;
+}
+.msn-msg-who.knox + .msn-msg-txt {
+    color: #003300;
+    font-weight: 500;
+}
+
+/* ── Knox Radio ───────────────────────────────── */
+#knox_radio .xp-window-body { background: #0a0a0a; }
+
+/* ── WMP Album Art ────────────────────────────── */
+.wmp-info { padding: 0; }
+
+/* ── Minesweeper ──────────────────────────────── */
+#minesweeper .xp-window-body { background: #c0c0c0; overflow: hidden; }
+
+/* ── Paint canvas cursor ──────────────────────── */
+#paint canvas { image-rendering: pixelated; }
+
+/* ── Screensaver ──────────────────────────────── */
+#screensaver { user-select: none; }
